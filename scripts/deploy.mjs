@@ -293,27 +293,134 @@ async function waitForDeploy(key, serviceId, deployId) {
   }
 }
 
+const BUILD_COMMAND = 'npm ci --include=dev && npm run build';
+const START_COMMAND = 'npm start';
+
+const sameRepo = (a, b) => !!a && !!b && a.replace(/\.git$/, '').replace(/\/$/, '').toLowerCase() === b.replace(/\.git$/, '').replace(/\/$/, '').toLowerCase();
+
+async function renderKey() {
+  if (process.env.RENDER_API_KEY) return process.env.RENDER_API_KEY;
+  console.log('\n  Render needs an API key for this step:');
+  console.log('  1. A browser tab opens on Render → Account Settings → API Keys.');
+  console.log('  2. Sign in or sign up, click "Create API Key", name it ATLAS, copy it.');
+  console.log('  3. Also make sure Render is connected to GitHub (Account Settings → Git Providers)');
+  console.log('     and can see your private repository.\n');
+  openBrowser('https://dashboard.render.com/u/settings#api-keys');
+  const key = await prompt('Paste your Render API key (hidden): ', { hidden: true });
+  if (!key) fail('No Render API key given.');
+  return key;
+}
+
+/** Render can't read the repo yet: open the GitHub connection page and let the user retry. */
+async function waitForRepoAccess(message) {
+  warn(`Render can’t read the repository yet: ${message}`);
+  console.log('  Connect GitHub in Render and give it access to this repository, then press Enter to retry.');
+  openBrowser('https://dashboard.render.com/select-repo?type=web');
+  if (!process.stdin.isTTY) fail('Render can’t access the repository.');
+  await prompt('Press Enter when done (or Ctrl+C to stop)... ');
+}
+
+const repoAccessError = (status, message) => status < 500 && /repo|git|github|access|permission|not found/i.test(message);
+
+/**
+ * Bring an existing Render service in line with this project: right repository and branch,
+ * build/start commands, and every setting ATLAS needs. Then deploy with a clean build cache.
+ */
+async function reconcileAndDeploy(key, svc, repoHttps, state) {
+  if (!sameRepo(svc.repo, repoHttps) || svc.branch !== 'main') {
+    step(`Pointing Render service "${svc.name}" at ${repoHttps} (it was using ${svc.repo || 'no repository'})`);
+    for (;;) {
+      const r = await render(key, 'PATCH', `/services/${svc.id}`, {
+        repo: repoHttps,
+        branch: 'main',
+        autoDeployTrigger: 'commit',
+        serviceDetails: { healthCheckPath: '/api/status', envSpecificDetails: { buildCommand: BUILD_COMMAND, startCommand: START_COMMAND } },
+      });
+      if (r.status === 200) {
+        svc = r.json;
+        break;
+      }
+      const message = r.json.message ?? `HTTP ${r.status}`;
+      if (repoAccessError(r.status, message)) {
+        await waitForRepoAccess(message);
+        continue;
+      }
+      fail(`Render couldn’t update the service: ${message}`);
+    }
+    ok('Render service now builds from the right repository');
+  }
+
+  const list = await render(key, 'GET', `/services/${svc.id}/env-vars?limit=100`);
+  if (list.status !== 200 || !Array.isArray(list.json)) fail(`Couldn’t read the service settings (HTTP ${list.status}).`);
+  const current = Object.fromEntries(list.json.map((i) => [i.envVar.key, i.envVar.value]));
+  const disk = svc.serviceDetails?.disk;
+  const wanted = {
+    NODE_VERSION: '22',
+    ATLAS_HOST: '0.0.0.0',
+    ATLAS_SECURE_COOKIES: 'true',
+    ATLAS_TRUST_PROXY: '1',
+    ATLAS_PUBLIC: 'true',
+    ...(disk?.mountPath ? { ATLAS_DATA_DIR: `${disk.mountPath.replace(/\/$/, '')}/atlas` } : {}),
+  };
+  if (!current.ATLAS_SETUP_TOKEN) wanted.ATLAS_SETUP_TOKEN = randomBytes(9).toString('base64url');
+  const env = readEnvLocal();
+  if (!current.ATLAS_INITIAL_M3U_URL && env.ATLAS_INITIAL_M3U_URL) {
+    if (await confirm('Send the playlist link from .env.local to Render as an encrypted setting, so it is imported into YOUR account on first start?')) {
+      wanted.ATLAS_INITIAL_M3U_URL = env.ATLAS_INITIAL_M3U_URL;
+      wanted.ATLAS_INITIAL_PROVIDER_NAME = env.ATLAS_INITIAL_PROVIDER_NAME || 'Primary provider';
+    }
+  }
+  let changed = 0;
+  for (const [k, v] of Object.entries(wanted)) {
+    if (current[k] === v) continue;
+    const r = await render(key, 'PUT', `/services/${svc.id}/env-vars/${encodeURIComponent(k)}`, { value: v });
+    if (r.status !== 200) fail(`Couldn’t set ${k} on Render (HTTP ${r.status}: ${r.json.message ?? 'error'}).`);
+    changed++;
+  }
+  ok(changed ? `Updated ${changed} Render setting${changed === 1 ? '' : 's'}` : 'Render settings already correct');
+  if (!disk) warn('This Render service has no disk: accounts and history are wiped on every restart. Add a 1 GB disk at /var/data in the Render dashboard to keep them.');
+
+  Object.assign(state, {
+    renderServiceId: svc.id,
+    renderUrl: svc.serviceDetails?.url ?? state.renderUrl,
+    renderDashboard: svc.dashboardUrl ?? state.renderDashboard,
+    renderRepo: repoHttps,
+    setupCode: wanted.ATLAS_SETUP_TOKEN ?? current.ATLAS_SETUP_TOKEN,
+  });
+  saveState(state);
+
+  step('Starting a clean deploy');
+  const d = await render(key, 'POST', `/services/${svc.id}/deploys`, { clearCache: 'clear' });
+  if (!d.json.id) fail(`Render didn’t start a deploy (HTTP ${d.status}: ${d.json.message ?? 'error'}).`);
+  const live = await waitForDeploy(key, svc.id, d.json.id);
+  if (!live) fail(`The deploy didn’t go live. Open ${state.renderDashboard} → Logs to see why.`);
+}
+
 async function ensureRenderService(state, repoUrl) {
-  if (state.renderServiceId) {
+  const repoHttps = repoUrl.replace(/\.git$/, '');
+  // Already set up and verified against this repository: the push triggers the redeploy.
+  if (state.renderServiceId && sameRepo(state.renderRepo, repoHttps)) {
     ok(`Render redeploys automatically from GitHub: ${state.renderUrl ?? state.renderDashboard ?? state.renderServiceId}`);
     return;
   }
   if (DRY) {
-    step('Would ask for a Render API key, create the web service (after you confirm the plan) and wait for it to go live');
+    step(state.renderServiceId ? 'Would check the Render service uses this repository and fix its settings, then deploy' : 'Would ask for a Render API key, create the web service (after you confirm the plan) and wait for it to go live');
     return;
   }
 
-  console.log('\n  Render setup (first time only)');
-  console.log('  1. A browser tab opens on Render → Account Settings → API Keys.');
-  console.log('  2. Sign in or sign up, click "Create API Key", name it ATLAS, copy it.');
-  console.log('  3. Also make sure Render is connected to GitHub (Account Settings → Git Providers)');
-  console.log('     and can see your new private repository.\n');
-  let key = process.env.RENDER_API_KEY;
-  if (!key) {
-    openBrowser('https://dashboard.render.com/u/settings#api-keys');
-    key = await prompt('Paste your Render API key (hidden): ', { hidden: true });
+  const key = await renderKey();
+
+  if (state.renderServiceId) {
+    step('Checking your Render service');
+    const existing = await render(key, 'GET', `/services/${state.renderServiceId}`);
+    if (existing.status === 401) fail('Render rejected that API key.');
+    if (existing.status === 200) return reconcileAndDeploy(key, existing.json, repoHttps, state);
+    if (existing.status !== 404) fail(`Couldn’t read the Render service (HTTP ${existing.status}).`);
+    warn('The Render service saved in deploy.local.json no longer exists. Creating a new one.');
+    delete state.renderServiceId;
+    delete state.renderUrl;
+    delete state.renderDashboard;
   }
-  if (!key) fail('No Render API key given.');
 
   const owners = await render(key, 'GET', '/owners?limit=20');
   if (owners.status === 401) fail('Render rejected that API key.');
@@ -327,15 +434,12 @@ async function ensureRenderService(state, repoUrl) {
   ok(`Render workspace: ${owner.name}`);
 
   let name = SERVICE_NAME_DEFAULT;
-  const existing = await render(key, 'GET', `/services?name=${encodeURIComponent(name)}&ownerId=${encodeURIComponent(owner.id)}&limit=20`);
-  if (existing.status === 200 && Array.isArray(existing.json) && existing.json.length) {
-    const svc = existing.json[0].service;
-    if (await confirm(`A Render service named "${name}" already exists (${svc.serviceDetails?.url ?? svc.dashboardUrl}). Use it?`)) {
-      Object.assign(state, { renderServiceId: svc.id, renderUrl: svc.serviceDetails?.url, renderDashboard: svc.dashboardUrl });
-      saveState(state);
-      const d = await render(key, 'POST', `/services/${svc.id}/deploys`, { clearCache: 'do_not_clear' });
-      if (d.json.id) await waitForDeploy(key, svc.id, d.json.id);
-      return;
+  const same = await render(key, 'GET', `/services?name=${encodeURIComponent(name)}&ownerId=${encodeURIComponent(owner.id)}&limit=20`);
+  if (same.status === 200 && Array.isArray(same.json) && same.json.length) {
+    const svc = same.json[0].service;
+    const where = sameRepo(svc.repo, repoHttps) ? 'already uses this repository' : `uses ${svc.repo || 'another repository'}; it will be switched to ${repoHttps}`;
+    if (await confirm(`A Render service named "${name}" already exists (${svc.serviceDetails?.url ?? svc.dashboardUrl}; it ${where}). Use it?`)) {
+      return reconcileAndDeploy(key, svc, repoHttps, state);
     }
     name = `atlas-${randomBytes(2).toString('hex')}`;
   }
@@ -358,13 +462,12 @@ async function ensureRenderService(state, repoUrl) {
   if (providerUrl && !(await confirm('Send the playlist link from .env.local to Render as an encrypted setting, so it is imported into YOUR account on first start?'))) providerUrl = undefined;
 
   const setupToken = randomBytes(9).toString('base64url');
-  const repoHttps = repoUrl.replace(/\.git$/, '');
   for (;;) {
     step(`Creating Render web service "${name}" (${plan}, ${region})`);
     const created = await render(key, 'POST', '/services', serviceBody({ ownerId: owner.id, name, repo: repoHttps, plan, region, setupToken, providerUrl, providerName: env.ATLAS_INITIAL_PROVIDER_NAME }));
     if (created.status === 201) {
       const svc = created.json.service;
-      Object.assign(state, { renderServiceId: svc.id, renderUrl: svc.serviceDetails?.url, renderDashboard: svc.dashboardUrl, setupCode: setupToken, plan });
+      Object.assign(state, { renderServiceId: svc.id, renderUrl: svc.serviceDetails?.url, renderDashboard: svc.dashboardUrl, renderRepo: repoHttps, setupCode: setupToken, plan });
       saveState(state);
       ok(`Render service created: ${svc.dashboardUrl}`);
       const live = await waitForDeploy(key, svc.id, created.json.deployId);
@@ -372,12 +475,8 @@ async function ensureRenderService(state, repoUrl) {
       return;
     }
     const message = created.json.message ?? created.json.error?.message ?? `HTTP ${created.status}`;
-    if (/repo|git|github|access|permission|not found/i.test(message) && created.status < 500) {
-      warn(`Render can’t read the repository yet: ${message}`);
-      console.log('  Connect GitHub in Render and give it access to this repository, then press Enter to retry.');
-      openBrowser('https://dashboard.render.com/select-repo?type=web');
-      if (!process.stdin.isTTY) fail('Render can’t access the repository.');
-      await prompt('Press Enter when done (or Ctrl+C to stop)... ');
+    if (repoAccessError(created.status, message)) {
+      await waitForRepoAccess(message);
       continue;
     }
     if (/payment|card|billing/i.test(message)) fail(`Render needs a payment method for the Starter plan: ${message}. Add one in the Render dashboard, or run again and choose Free.`);
@@ -385,14 +484,17 @@ async function ensureRenderService(state, repoUrl) {
   }
 }
 
+/** Returns whether the website still needs its owner account (so the setup code matters). */
 async function checkSite(state) {
-  if (DRY || !state.renderUrl) return;
+  if (DRY || !state.renderUrl) return false;
   try {
     const r = await fetch(`${state.renderUrl}/api/status`, { headers: { 'User-Agent': 'atlas-deploy' } });
     const j = await r.json();
     if (j.server) ok(`Website is up: ${state.renderUrl}`);
+    return !!j.setupRequired;
   } catch {
     warn('The website didn’t answer yet; it may need another minute.');
+    return !!state.setupCode;
   }
 }
 
@@ -406,16 +508,18 @@ async function main() {
   const repo = await ensureGitHubRepo(state);
   push();
   await ensureRenderService(state, repo);
-  await checkSite(state);
+  const needsSetup = await checkSite(state);
 
   console.log('\n  ------------------------------------------------------------');
   if (state.renderUrl) {
     console.log(`  Your website:  ${state.renderUrl}`);
-    if (state.setupCode) console.log(`  Setup code:    ${state.setupCode}   (needed once, to create the owner account)`);
-    console.log('  Next: open the website, enter the setup code, create your account,');
-    console.log('        then allow your provider’s HTTP connection when asked.');
+    if (needsSetup && state.setupCode) {
+      console.log(`  Setup code:    ${state.setupCode}   (needed once, to create the owner account)`);
+      console.log('  Next: open the website, enter the setup code, create your account,');
+      console.log('        then allow your provider’s HTTP connection when asked.');
+      openBrowser(state.renderUrl);
+    }
     console.log('  Saved in deploy.local.json (kept off GitHub).');
-    if (state.setupCode) openBrowser(state.renderUrl);
   }
   console.log('  Run deploy-to-render.bat again any time to publish changes.');
   console.log('  ------------------------------------------------------------');
