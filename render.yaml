@@ -1,0 +1,48 @@
+# Render Blueprint for ATLAS — https://render.com/docs/blueprint-spec
+#
+# One web service runs the ATLAS server, which also serves the built web app.
+# Your provider URL is NOT stored here: Render asks for ATLAS_INITIAL_M3U_URL when you
+# create the Blueprint (sync: false), and keeps it as a secret environment variable.
+
+services:
+  - type: web
+    name: atlas
+    runtime: node
+    # A persistent disk (below) needs a paid instance. On the free plan the database, encryption
+    # key and owner account would be wiped on every deploy and restart.
+    plan: starter
+    # Your provider's servers are in Europe; a nearby region keeps channel start-up fast.
+    region: frankfurt
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/status
+    autoDeploy: true
+    disk:
+      name: atlas-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ATLAS_HOST
+        value: 0.0.0.0
+      - key: ATLAS_DATA_DIR
+        value: /var/data/atlas
+      # Render terminates HTTPS in front of the service.
+      - key: ATLAS_SECURE_COOKIES
+        value: "true"
+      # Trust one proxy hop so per-IP sign-in limits see the real client address.
+      - key: ATLAS_TRUST_PROXY
+        value: "1"
+      # Internet-facing: upstream fetches may only reach public addresses (no internal network).
+      - key: ATLAS_PUBLIC
+        value: "true"
+      # Random code required to create the owner account, so nobody else can claim the
+      # server before you. Find it under Environment in the Render dashboard.
+      - key: ATLAS_SETUP_TOKEN
+        generateValue: true
+      # Your M3U / Xtream get.php link. Entered in the Render dashboard, never committed.
+      - key: ATLAS_INITIAL_M3U_URL
+        sync: false
+      - key: ATLAS_INITIAL_PROVIDER_NAME
+        value: Primary provider

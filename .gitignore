@@ -1,0 +1,34 @@
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+*.log
+.DS_Store
+
+# Secrets and local runtime data — never commit
+.env
+.env.*
+!.env.example
+data/
+*.sqlite
+*.sqlite-*
+*.db
+
+# Local editor/preview config (machine-specific paths)
+.claude/launch.json
+
+# Android build outputs and signing secrets
+apps/android/.gradle/
+apps/android/build/
+apps/android/app/build/
+apps/android/local.properties
+apps/android/keystore.properties
+apps/android/keystore/
+*.jks
+*.keystore
+*.apk
+*.aab
+
+# Local deploy record (repo, Render service, setup code)
+deploy.local.json

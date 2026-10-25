@@ -1,0 +1,105 @@
+/* ATLAS design tokens — mirrors packages/core/src/tokens.ts */
+:root {
+  --obsidian: #080a0e;
+  --graphite: #11151b;
+  --graphite-raised: #171c24;
+  --soft-white: #f4f6f8;
+  --silver: #cad5e2;
+  --ice: #81c7ff;
+  --ice-deep: #3d8fd6;
+  --live: #ff4d5e;
+  --fresh: #ff9f43;
+  --success: #5be0a0;
+  --warning: #ffc861;
+  --danger: #ff6b7a;
+
+  /* Surfaces */
+  --bg: var(--obsidian);
+  --bg-raised: var(--graphite);
+  --text: var(--soft-white);
+  --text-2: rgba(244, 246, 248, 0.72);
+  --text-3: rgba(244, 246, 248, 0.5);
+  --hairline: rgba(255, 255, 255, 0.1);
+
+  /* Ambient accent, updated from focused artwork */
+  --accent: 129 199 255;
+  --accent-soft: rgb(var(--accent) / 0.22);
+
+  /* Glass material */
+  --glass-fill: rgba(255, 255, 255, 0.075);
+  --glass-fill-strong: rgba(255, 255, 255, 0.14);
+  --glass-fill-solid: rgba(28, 33, 42, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.34);
+  --glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 -1px 0 rgba(0, 0, 0, 0.25) inset, 0 20px 50px -18px rgba(0, 0, 0, 0.6);
+  --glass-blur: 28px;
+  --glass-saturate: 1.7;
+
+  /* Radii */
+  --r-xs: 0.5rem;
+  --r-sm: 0.75rem;
+  --r-md: 1.125rem;
+  --r-lg: 1.5rem;
+  --r-xl: 2rem;
+  --r-pill: 999px;
+
+  /* Layout */
+  --gutter: clamp(1rem, 4.2vw, 5rem);
+  --nav-h: 4.25rem;
+  --row-gap: clamp(1.75rem, 3vw, 3rem);
+  --card-gap: clamp(0.75rem, 1.4vw, 1.5rem);
+  --poster-w: clamp(7.5rem, 11.2vw, 15rem);
+  --landscape-w: clamp(15rem, 25vw, 30rem);
+  --channel-w: clamp(13rem, 17vw, 21rem);
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emph: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --t-fast: 140ms;
+  --t-base: 240ms;
+  --t-slow: 420ms;
+
+  --font: 'Inter Variable', 'SF Pro Display', -apple-system, 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+/* Light appearance (Settings → Appearance). Artwork-heavy screens stay cinematic-dark. */
+:root[data-theme='light'] {
+  --bg: #eef1f5;
+  --bg-raised: #ffffff;
+  --text: #0d1117;
+  --text-2: rgba(13, 17, 23, 0.72);
+  --text-3: rgba(13, 17, 23, 0.5);
+  --hairline: rgba(13, 17, 23, 0.1);
+  --glass-fill: rgba(255, 255, 255, 0.55);
+  --glass-fill-strong: rgba(255, 255, 255, 0.75);
+  --glass-fill-solid: rgba(250, 251, 253, 0.95);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-highlight: rgba(255, 255, 255, 0.95);
+  --glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 20px 50px -24px rgba(20, 30, 50, 0.35);
+  color-scheme: light;
+}
+
+/* Reduced transparency: glass becomes solid, blur is removed. */
+:root[data-transparency='reduced'] {
+  --glass-fill: rgba(30, 36, 46, 0.97);
+  --glass-fill-strong: rgba(44, 52, 64, 0.98);
+  --glass-blur: 0px;
+}
+:root[data-theme='light'][data-transparency='reduced'] {
+  --glass-fill: rgba(255, 255, 255, 0.98);
+  --glass-fill-strong: #ffffff;
+}
+
+/* TVs: no live blur (expensive on Fire TV sticks), larger safe margins. */
+:root[data-device='tv'] {
+  --glass-blur: 0px;
+  --glass-fill: rgba(40, 46, 58, 0.78);
+  --glass-fill-strong: rgba(70, 78, 92, 0.85);
+  --gutter: 5vw;
+}
+
+/* Interface scaling (Settings → Appearance) */
+:root[data-scale='small'] { font-size: 90%; }
+:root[data-scale='large'] { font-size: 112%; }

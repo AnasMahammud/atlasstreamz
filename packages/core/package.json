@@ -1,0 +1,11 @@
+{
+  "name": "@atlas/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Platform-neutral ATLAS domain logic: models, playlist/EPG parsing, search, recommendations, design tokens.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false
+}

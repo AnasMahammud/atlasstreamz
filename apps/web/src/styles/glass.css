@@ -1,0 +1,456 @@
+/* ───────────── Liquid Glass material ───────────── */
+
+.glass {
+  position: relative;
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-shadow);
+  isolation: isolate;
+}
+
+/* Specular rim: a gradient hairline that is brighter where light "hits" the edge. */
+.glass::before,
+.glass-btn::before,
+.chip::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    150deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.12) 22%,
+    rgba(255, 255, 255, 0.03) 50%,
+    rgba(255, 255, 255, 0.08) 78%,
+    rgba(255, 255, 255, 0.28) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Soft top sheen, like light pooling on curved glass. */
+.glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(130% 70% at 25% -20%, rgba(255, 255, 255, 0.14), transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glass > * {
+  position: relative;
+  z-index: 2;
+}
+
+.glass-strong {
+  background: var(--glass-fill-strong);
+}
+
+.glass-solid {
+  background: var(--glass-fill-solid);
+}
+
+:root[data-theme='light'] .glass::after {
+  background: radial-gradient(130% 70% at 25% -20%, rgba(255, 255, 255, 0.7), transparent 55%);
+}
+
+/* ───────────── Buttons ───────────── */
+
+.glass-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  height: 2.75rem;
+  padding: 0 1.35rem;
+  border-radius: var(--r-pill);
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-shadow);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.98rem;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  transition:
+    transform var(--t-base) var(--ease-spring),
+    background-color var(--t-base) var(--ease-standard),
+    color var(--t-base) var(--ease-standard),
+    box-shadow var(--t-base) var(--ease-standard);
+  will-change: transform;
+}
+
+.glass-btn svg {
+  width: 1.15em;
+  height: 1.15em;
+  flex: none;
+}
+
+.glass-btn:hover,
+.glass-btn:focus-visible,
+.glass-btn[data-focused='true'] {
+  background: var(--glass-fill-strong);
+  transform: scale(1.06);
+  box-shadow:
+    var(--glass-shadow),
+    0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 12px 40px -12px rgb(var(--accent) / 0.55);
+}
+
+.glass-btn:active {
+  transform: scale(0.97);
+  transition-duration: 80ms;
+}
+
+/* Primary: frosted white with dark text — the "lit" state from the reference nav. */
+.glass-btn.primary {
+  background: rgba(244, 246, 248, 0.92);
+  color: #0b0e13;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.glass-btn.primary:hover,
+.glass-btn.primary:focus-visible {
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 14px 44px -10px rgba(255, 255, 255, 0.45);
+}
+
+.glass-btn.icon {
+  width: 2.75rem;
+  padding: 0;
+}
+
+.glass-btn.lg {
+  height: 3.25rem;
+  padding: 0 1.75rem;
+  font-size: 1.05rem;
+}
+
+.glass-btn.sm {
+  height: 2.2rem;
+  padding: 0 1rem;
+  font-size: 0.88rem;
+}
+
+.glass-btn.danger {
+  color: var(--danger);
+}
+
+.glass-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ───────────── Chips (filters, seasons, categories) ───────────── */
+
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.3rem;
+  padding: 0 1.05rem;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-2);
+  font-size: 0.92rem;
+  font-weight: 560;
+  white-space: nowrap;
+  transition:
+    transform var(--t-base) var(--ease-spring),
+    background-color var(--t-base) var(--ease-standard),
+    color var(--t-base);
+}
+.chip:hover,
+.chip:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--text);
+  transform: scale(1.05);
+}
+.chip[aria-pressed='true'],
+.chip[aria-selected='true'] {
+  background: rgba(244, 246, 248, 0.92);
+  color: #0b0e13;
+}
+.chip[aria-pressed='true']::before,
+.chip[aria-selected='true']::before {
+  display: none;
+}
+.chip .count {
+  font-size: 0.78rem;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ───────────── Inputs ───────────── */
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+.field label,
+.field .label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.input {
+  width: 100%;
+  height: 3rem;
+  padding: 0 1.1rem;
+  border-radius: var(--r-md);
+  border: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  font-size: 1rem;
+  transition:
+    border-color var(--t-fast),
+    box-shadow var(--t-fast),
+    background-color var(--t-fast);
+}
+.input::placeholder {
+  color: var(--text-3);
+}
+.input:focus {
+  border-color: rgb(var(--accent) / 0.8);
+  box-shadow: 0 0 0 4px rgb(var(--accent) / 0.18);
+  background: rgba(0, 0, 0, 0.36);
+}
+.field .hint {
+  font-size: 0.8rem;
+  color: var(--text-3);
+}
+.field .error {
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
+/* Toggle switch */
+.switch {
+  position: relative;
+  width: 3.1rem;
+  height: 1.8rem;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.16);
+  transition: background-color var(--t-base) var(--ease-standard);
+  flex: none;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: transform var(--t-base) var(--ease-spring);
+}
+.switch[aria-checked='true'] {
+  background: rgb(var(--accent));
+}
+.switch[aria-checked='true']::after {
+  transform: translateX(1.3rem);
+}
+.switch:focus-visible {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.7);
+}
+
+/* Segmented control */
+.segmented {
+  display: inline-flex;
+  padding: 0.25rem;
+  gap: 0.2rem;
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--hairline);
+}
+.segmented button {
+  height: 2.1rem;
+  padding: 0 1rem;
+  border-radius: var(--r-pill);
+  font-size: 0.88rem;
+  font-weight: 580;
+  color: var(--text-2);
+  transition: background-color var(--t-base), color var(--t-base), transform var(--t-base) var(--ease-spring);
+}
+.segmented button:hover,
+.segmented button:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+}
+.segmented button[aria-pressed='true'] {
+  background: rgba(244, 246, 248, 0.92);
+  color: #0b0e13;
+}
+
+/* ───────────── Badges ───────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.45rem;
+  padding: 0 0.5rem;
+  border-radius: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+  text-transform: uppercase;
+}
+.badge.solid {
+  background: rgba(255, 255, 255, 0.9);
+  color: #0b0e13;
+  border-color: transparent;
+}
+.badge.live {
+  background: var(--live);
+  border-color: transparent;
+  color: #fff;
+}
+.badge.live::before {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: #fff;
+  animation: livePulse 1.6s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ───────────── Dialog ───────────── */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: var(--gutter);
+  background: rgba(4, 6, 9, 0.55);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+:root[data-device='tv'] .dialog-backdrop {
+  background: rgba(4, 6, 9, 0.82);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.dialog {
+  width: min(34rem, 100%);
+  max-height: calc(100dvh - 2 * var(--gutter));
+  overflow: auto;
+  border-radius: var(--r-xl);
+  padding: 2rem;
+  background: rgba(24, 29, 38, 0.72);
+}
+.dialog h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.4rem;
+}
+.dialog .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+  flex-wrap: wrap;
+}
+
+/* ───────────── Toasts ───────────── */
+
+.toasts {
+  position: fixed;
+  z-index: 300;
+  left: 50%;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: grid;
+  gap: 0.6rem;
+  justify-items: center;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 3rem;
+  padding: 0.6rem 0.75rem 0.6rem 1.2rem;
+  border-radius: var(--r-pill);
+  background: rgba(26, 31, 40, 0.78);
+  font-size: 0.95rem;
+  font-weight: 540;
+  max-width: min(36rem, calc(100vw - 2rem));
+}
+.toast .dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: rgb(var(--accent));
+  flex: none;
+}
+.toast.error .dot {
+  background: var(--danger);
+}
+.toast.success .dot {
+  background: var(--success);
+}
+
+/* ───────────── Skeletons ───────────── */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--r-md);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+  animation: shimmer 1.6s var(--ease-standard) infinite;
+}
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Spinner */
+.spinner {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.14);
+  border-top-color: rgba(255, 255, 255, 0.9);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

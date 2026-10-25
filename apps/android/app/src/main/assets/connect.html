@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Connect to ATLAS</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: radial-gradient(120% 90% at 80% -10%, rgba(129, 199, 255, 0.18), transparent 55%), linear-gradient(180deg, #151a22, #080a0e);
+        color: #f4f6f8;
+        font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        padding: 5vw;
+      }
+      .card {
+        width: min(36rem, 100%);
+        padding: 2.4rem;
+        border-radius: 2rem;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.8);
+        display: grid;
+        gap: 1.3rem;
+      }
+      h1 {
+        margin: 0;
+        font-size: 2rem;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0;
+        color: rgba(244, 246, 248, 0.72);
+        line-height: 1.5;
+      }
+      .mark {
+        font-weight: 750;
+        letter-spacing: 0.32em;
+        font-size: 0.9rem;
+        color: #b9dcff;
+      }
+      input {
+        width: 100%;
+        height: 3.4rem;
+        padding: 0 1.1rem;
+        border-radius: 1rem;
+        border: 2px solid rgba(255, 255, 255, 0.16);
+        background: rgba(0, 0, 0, 0.35);
+        color: #f4f6f8;
+        font-size: 1.15rem;
+        outline: none;
+      }
+      input:focus {
+        border-color: #81c7ff;
+        box-shadow: 0 0 0 4px rgba(129, 199, 255, 0.2);
+      }
+      button {
+        height: 3.4rem;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(244, 246, 248, 0.92);
+        color: #0b0e13;
+        font-size: 1.1rem;
+        font-weight: 650;
+        outline: none;
+        transition: transform 0.2s;
+      }
+      button:focus {
+        transform: scale(1.04);
+        box-shadow: 0 0 0 3px #fff, 0 14px 40px -12px rgba(255, 255, 255, 0.5);
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      .error {
+        color: #ff8a96;
+        min-height: 1.3rem;
+      }
+      .hint {
+        font-size: 0.9rem;
+        color: rgba(244, 246, 248, 0.5);
+      }
+    </style>
+  </head>
+  <body>
+    <form class="card" id="form" autocomplete="off">
+      <span class="mark">ATLAS</span>
+      <h1>Connect to your ATLAS server</h1>
+      <p>Enter the address of your ATLAS website. You’ll sign in with your own account next.</p>
+      <input id="server" inputmode="url" spellcheck="false" autocapitalize="none" placeholder="your-atlas.onrender.com" aria-label="Server address" />
+      <div class="error" id="error" role="alert"></div>
+      <button id="go" type="submit">Connect</button>
+      <span class="hint">Examples: https://your-atlas.onrender.com · http://192.168.1.20:4870</span>
+    </form>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const input = document.getElementById('server');
+      const button = document.getElementById('go');
+      const error = document.getElementById('error');
+      input.value = params.get('server') || '';
+      if (params.get('error')) error.textContent = params.get('error');
+
+      function setBusy(busy) {
+        button.disabled = busy;
+        button.textContent = busy ? 'Connecting…' : 'Connect';
+      }
+      window.onConnectError = (message) => {
+        setBusy(false);
+        error.textContent = message;
+        input.focus();
+      };
+      document.getElementById('form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const value = input.value.trim();
+        if (!value) {
+          error.textContent = 'Enter your ATLAS server address.';
+          return;
+        }
+        error.textContent = '';
+        setBusy(true);
+        window.AtlasNative.connect(value);
+      });
+      // Remote control: up/down move between the field and the button.
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' && document.activeElement === input) {
+          e.preventDefault();
+          button.focus();
+        } else if (e.key === 'ArrowUp' && document.activeElement === button) {
+          e.preventDefault();
+          input.focus();
+        }
+      });
+      (input.value ? button : input).focus();
+    </script>
+  </body>
+</html>

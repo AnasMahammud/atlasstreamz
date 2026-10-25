@@ -1,0 +1,29 @@
+{
+  "name": "atlas",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ATLAS — Your Universe of Entertainment",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev:all",
+    "dev:all": "node scripts/dev.mjs",
+    "dev:server": "npm run dev -w @atlas/server",
+    "dev:web": "npm run dev -w @atlas/web",
+    "build": "npm run build -w @atlas/web",
+    "start": "npm run start -w @atlas/server",
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/core && tsc -p apps/server && tsc -p apps/web"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "sharp": "^0.33.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
