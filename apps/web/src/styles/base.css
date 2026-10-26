@@ -24,11 +24,23 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   overscroll-behavior-y: none;
+  /* No double-tap zoom; taps fire immediately. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
 }
 
 #root {
   min-height: 100vh;
   isolation: isolate;
+  /* Last line of defence: nothing may make the page wider than the screen. */
+  overflow-x: clip;
+}
+
+/* Phones and small tablets: a fixed, readable base size (16px also stops iOS zooming into inputs). */
+@media (max-width: 820px) {
+  html {
+    font-size: 16px;
+  }
 }
 
 img {

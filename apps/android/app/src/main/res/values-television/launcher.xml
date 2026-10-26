@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fire TV ignores android:banner for sideloaded apps and fits the launcher activity's
+         icon into its wide home-screen tile instead, so on TVs that icon is the banner
+         (emblem on the left, ATLAS beside it). Android TV / Google TV read android:banner. -->
+    <drawable name="launcher_tile">@drawable/banner</drawable>
+</resources>

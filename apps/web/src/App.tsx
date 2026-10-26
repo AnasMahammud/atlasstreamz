@@ -1,9 +1,10 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useStatus } from './lib/queries.ts';
-import { pushBack } from './lib/focus.ts';
-import { Ambient, BottomNav, TopNav } from './components/Nav.tsx';
+import { focusElement, pushBack } from './lib/focus.ts';
+import { useUi } from './lib/store.ts';
+import { Ambient, BottomNav, SideRail, TopNav } from './components/Nav.tsx';
 import { Toasts } from './components/Primitives.tsx';
 import { Startup } from './screens/Startup.tsx';
 import { Login, Register, Setup } from './screens/Welcome.tsx';
@@ -66,35 +67,47 @@ function ServerUnreachable() {
   );
 }
 
+const TOP_LEVEL = ['/', '/live', '/movies', '/shows', '/my-list', '/search', '/guide', '/settings'];
+
+/** Focus the side menu's current item (TV). */
+function focusRail(): boolean {
+  const rail = document.querySelector<HTMLElement>('[data-rail]');
+  const target = rail?.querySelector<HTMLElement>("[aria-current='page']") ?? rail?.querySelector<HTMLElement>('a');
+  return focusElement(target);
+}
+
 function Shell() {
   const location = useLocation();
   const navigate = useNavigate();
-  // Back on a top-level tab goes Home; on Home it does nothing (no accidental exits).
+  const tv = useUi((s) => s.device) === 'tv';
+  const topLevel = TOP_LEVEL.includes(location.pathname) || location.pathname.startsWith('/settings');
   useEffect(
     () =>
       pushBack(() => {
-        if (['/live', '/movies', '/shows', '/my-list', '/search', '/guide', '/settings'].some((p) => location.pathname === p)) {
+        // TV: Back from content on a main page moves into the side menu first, then Home, then exits.
+        if (tv && topLevel && !document.querySelector('[data-rail]')?.contains(document.activeElement)) return focusRail();
+        if (topLevel && location.pathname !== '/') {
           navigate('/');
           return true;
         }
         return false;
       }),
-    [location.pathname, navigate],
+    [location.pathname, navigate, tv, topLevel],
   );
   useEffect(() => {
-    window.scrollTo({ top: 0 });
+    window.scrollTo(0, 0);
   }, [location.pathname]);
   return (
-    <div className="shell">
-      <TopNav />
+    <div className={`shell ${tv ? 'shell-tv' : ''}`}>
+      {tv ? <SideRail /> : <TopNav />}
       <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={location.pathname.split('/')[1] || 'home'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+        <motion.div key={location.pathname.split('/')[1] || 'home'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: tv ? 0.12 : 0.18 }}>
           <Suspense fallback={<Splash />}>
             <Outlet />
           </Suspense>
         </motion.div>
       </AnimatePresence>
-      <BottomNav />
+      {!tv && <BottomNav />}
     </div>
   );
 }
@@ -102,8 +115,12 @@ function Shell() {
 export function App() {
   const [booted, setBooted] = useState(false);
   const done = useCallback(() => setBooted(true), []);
+  const device = useUi((s) => s.device);
+  const motionPref = useUi((s) => s.appearance.motion);
+  // TVs (Fire TV sticks especially) get fades only: no springs, slides or scaling.
+  const reduced = device === 'tv' || motionPref === 'reduced' ? 'always' : 'user';
   return (
-    <>
+    <MotionConfig reducedMotion={reduced}>
       <Ambient />
       {!booted ? (
         <Startup onDone={done} />
@@ -145,6 +162,6 @@ export function App() {
         </motion.div>
       )}
       <Toasts />
-    </>
+    </MotionConfig>
   );
 }

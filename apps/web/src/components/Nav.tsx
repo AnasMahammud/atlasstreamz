@@ -122,6 +122,48 @@ function SyncButton({ status }: { status?: Status }) {
   );
 }
 
+/**
+ * TV navigation: a left rail that is always on screen (Android TV / Fire TV convention). It
+ * shows icons; moving left into it expands it with labels. Entering it always lands on the
+ * current page's item, and Back from any top-level page returns focus here.
+ */
+export function SideRail() {
+  const { pathname } = useLocation();
+  const { data: status } = useStatus();
+  const profile = status?.profile;
+  const items = [
+    { to: '/search', label: 'Search', icon: IconSearch, active: pathname.startsWith('/search') },
+    { to: '/', label: 'Home', icon: IconHome, active: pathname === '/' },
+    { to: '/live', label: 'Live TV', icon: IconLive, active: pathname.startsWith('/live') },
+    { to: '/guide', label: 'Guide', icon: IconGuide, active: pathname.startsWith('/guide') },
+    { to: '/movies', label: 'Movies', icon: IconFilm, active: pathname.startsWith('/movies') || pathname.startsWith('/movie/') },
+    { to: '/shows', label: 'TV Shows', icon: IconShows, active: pathname.startsWith('/shows') || pathname.startsWith('/series/') },
+    { to: '/my-list', label: 'My List', icon: IconBookmark, active: pathname.startsWith('/my-list') },
+    { to: '/settings', label: 'Settings', icon: IconSettings, active: pathname.startsWith('/settings') },
+  ];
+  return (
+    <nav className="side-rail" aria-label="Main" data-focus-zone="rail" data-focus-enter="[aria-current='page']" data-rail>
+      <div className="rail-brand" aria-hidden="true">
+        <AtlasEmblem size={40} />
+      </div>
+      <div className="rail-items">
+        {items.map((i) => (
+          <Link key={i.to} to={i.to} className="rail-link" aria-current={i.active ? 'page' : undefined} data-focusable>
+            <i.icon />
+            <span className="rail-label">{i.label}</span>
+          </Link>
+        ))}
+      </div>
+      {profile && (
+        <Link to="/profiles" className="rail-link rail-profile" aria-label={`Profile: ${profile.name}. Switch profile`} data-focusable>
+          <Avatar avatar={profile.avatar} name={profile.name} size={34} />
+          <span className="rail-label">{profile.name}</span>
+        </Link>
+      )}
+    </nav>
+  );
+}
+
 /** AtlasBottomNavigation (phones). */
 export function BottomNav() {
   const { pathname } = useLocation();

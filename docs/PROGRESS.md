@@ -1,9 +1,11 @@
 # ATLAS — progress and handoff
 
-Last updated: 25 October 2026 (accounts and Android app added). "Verified" means exercised in this session against your real provider (9,876 live channels, 16,200 movies, 3,523 series, ~54,500 guide listings) in desktop Chromium, or covered by automated tests. Anything else is marked as unverified.
+Last updated: 25 October 2026 (phone zoom and Fire TV fixes, APK 0.3.0). "Verified" means exercised in this session against your real provider (9,876 live channels, 16,200 movies, 3,523 series, ~54,500 guide listings) in desktop Chromium, or covered by automated tests. Anything else is marked as unverified.
 
 ## New in this round
 
+- **Phones: no more miniature layout or pinch zoom.** Every row's grid track had stretched to its shelf's full width (5,778 px), so phones zoomed out to fit it. Rows are now capped at the screen width, the viewport is locked (no pinch or double-tap zoom, including iOS Safari), and text keeps a 16 px base. Verified at 375 px on all 13 screens in the browser pane.
+- **Fire TV / Android TV: side menu, smooth scrolling, lighter rendering.** TV mode has a left side menu (Search, Home, Live TV, Guide, Movies, TV Shows, My List, Settings, profile) that stays on screen and opens when you press Left; Back jumps to it. Moving Down scrolls each row to the top of the screen instantly, and Right returns to the card you left. Blur, shadows, shimmer, ambient backgrounds and page animations are off on TV. The APK no longer uses "overview mode", which shrank the page, and zoom is disabled. Verified with arrow keys at 960×540 in TV mode; **not yet tried on a real Fire TV.**
 - **Separate accounts.** Every person signs up with their own email and password and gets their own profiles, PINs, history, My List, recommendations and content sources. Sign-up is invite-only by default; the owner can switch to open or closed and manage accounts under Settings → Members. Verified with automated tests (an invited friend can't see, search, play or stream the owner's content) and in the browser (invite link → new account → "Create your first profile" → "Connect a content source").
 - **Android app.** One signed APK (`dist\ATLAS.apk`, 4.1 MB) for phones, Android TV and Fire TV: the ATLAS interface plus a native Media3/ExoPlayer player. Built and statically verified on this PC: the manifest has the phone and TV launchers, the TV banner and only optional hardware features, and the signature verifies (v1+v2). **Not yet run on a real device.** See [ANDROID.md](ANDROID.md).
 - **Public-server hardening.** On Render, upstream fetches can't reach private or internal addresses, so members can't use playlist URLs to probe the server's network.
@@ -18,7 +20,7 @@ Last updated: 25 October 2026 (accounts and Android app added). "Verified" means
 | 4 Streaming player | **Done for web.** HLS (hls.js), MPEG-TS (mpegts.js) and native files; live and VOD; resume; audio, subtitle and quality menus; speed; aspect; PiP; fullscreen; up-next countdown. |
 | 5 Advanced features | **Mostly done.** EPG timeline, typo-tolerant search, My List, PIN security, multi-profile personalisation, content-based recommendations, stream recovery. *Not done:* online subtitle search (needs a subtitle-service API key). |
 | 6 Device optimisation | **Partial.** Responsive mobile and desktop, TV mode with spatial navigation and no live blur, Android APK with native playback. *Not done:* iOS app; testing on real phones, TVs and Fire TV. |
-| 7 Production readiness | **Partial.** Security review of auth flows, 53 automated tests, production build, PWA, Render blueprint and deploy script. *Not done:* native release builds, load testing. |
+| 7 Production readiness | **Partial.** Security review of auth flows, 63 automated tests, production build, PWA, Render blueprint and deploy script. *Not done:* native release builds, load testing. |
 
 ## Acceptance criteria
 
@@ -53,6 +55,8 @@ Last updated: 25 October 2026 (accounts and Android app added). "Verified" means
 - The PIN pad's keyboard Backspace and Enter didn't work; remote OK and keyboard Enter are now told apart.
 - A full-page CSS filter on the app wrapper would have broken the fixed nav and player. Removed.
 - The guide opened on a category with no listings. It now picks the best-covered category.
+- Rows on Home and detail pages forced the page to 5,778 px wide, which made phones zoom out and the Fire TV WebView shrink the interface. Grid tracks are now `minmax(0, 1fr)`.
+- On TV, Down from a row could jump into the side menu, because the collapsed menu links were still 212 px wide. Fixed, and the menu and content are now separate focus areas.
 - The deploy script's credential scan failed open when `git grep` errored. It now stops on any scan error, and was proven against a planted fake credential.
 
 ## Next steps, in order

@@ -443,6 +443,8 @@
   height: 2.6rem;
   width: auto;
   min-width: 10rem;
+  max-width: 100%;
+  text-overflow: ellipsis;
   padding: 0 2.4rem 0 1rem;
   border-radius: var(--r-pill);
   appearance: none;
@@ -647,7 +649,7 @@
 
 .live-page {
   display: grid;
-  grid-template-columns: minmax(15rem, 19rem) 1fr;
+  grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr);
   gap: 2rem;
   align-items: start;
 }
@@ -773,6 +775,12 @@
   gap: 0.6rem;
   align-items: center;
   flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+.guide-controls .select {
+  flex: 1 1 12rem;
+  min-width: 0;
 }
 .guide {
   border-radius: var(--r-lg);
@@ -1165,4 +1173,17 @@
   font-weight: 700;
   letter-spacing: 0.18em;
   color: var(--text);
+}
+
+/* TV startup: no blur filters (expensive on TV GPUs). */
+.startup.tv,
+.startup.tv .startup-mark,
+.startup.tv .startup-word {
+  filter: none !important;
+}
+.startup.tv .startup-glow {
+  filter: none;
+}
+.startup.tv.out {
+  filter: none;
 }

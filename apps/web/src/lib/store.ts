@@ -46,6 +46,8 @@ export const useUi = create<UiState>((set, get) => ({
   toasts: [],
   setDevice: (device) => set({ device }),
   setAmbient: (image) => {
+    // TVs skip the ambient background entirely: decoding artwork on every focus move is too costly.
+    if (get().device === 'tv') return;
     // Debounced so rapid focus movement across a shelf doesn't thrash the background.
     window.clearTimeout(ambientTimer);
     ambientTimer = window.setTimeout(() => {

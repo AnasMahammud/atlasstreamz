@@ -23,6 +23,8 @@ On first launch the app asks for your server address, for example `https://your-
 2. Install the free **Downloader** app from the Amazon Appstore.
 3. Put `ATLAS.apk` somewhere reachable by URL (for example a private Google Drive direct link, or your PC on the LAN), open that URL in Downloader and install.
 
+The home-screen tile shows the ATLAS logo with the name beside it. Fire TV ignores the usual TV banner for apps not from the Amazon Appstore, so on TVs the app's launcher icon *is* the wide banner (`res/values-television/launcher.xml`); phones keep the round icon. Fire TV caches tiles, so if an update still shows the old tile, restart the Fire TV (Settings → My Fire TV → Restart), or uninstall and reinstall ATLAS (you'll need to sign in again).
+
 ### Android TV / Google TV
 - Same as Fire TV with a file-manager or Downloader app, or with adb from this PC:
 

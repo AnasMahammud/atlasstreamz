@@ -60,17 +60,32 @@ function icon(size, { pad = 0.74, rounded = true, transparent = false } = {}) {
   </svg>`;
 }
 
-/** Android TV banner (320×180 base) and Fire TV wide icon: emblem + wordmark. */
-function banner(w, h) {
-  const e = h * 0.62;
-  const cx = w * 0.22;
-  const textX = cx + e / 2 + w * 0.06;
-  const textW = w - textX - w * 0.07;
+const wordmark = (size) =>
+  `<text font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif" font-weight="700" font-size="${size}" letter-spacing="${size * 0.1}" fill="#F4F6F8">ATLAS</text>`;
+
+/** Ink box of the wordmark at `size`, measured by rendering it (librsvg ignores textLength). */
+async function measureWordmark(size) {
+  const pad = size;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size * 6}" height="${size * 3}"><g transform="translate(${pad} ${pad * 2})">${wordmark(size)}</g></svg>`;
+  const { info } = await sharp(Buffer.from(svg)).trim({ threshold: 1 }).toBuffer({ resolveWithObject: true });
+  // trimOffset is negative: how far the ink starts from the canvas edge.
+  return { left: -info.trimOffsetLeft - pad, top: -info.trimOffsetTop - pad * 2, width: info.width, height: info.height };
+}
+
+/** Android TV banner (320×180 base) and Fire TV wide icon: emblem on the left, wordmark beside it, centred. */
+async function banner(w, h) {
+  const e = h * 0.6;
+  const size = h * 0.24;
+  const ink = await measureWordmark(size);
+  const gap = h * 0.09;
+  const x0 = (w - (e + gap + ink.width)) / 2;
+  const textX = x0 + e + gap - ink.left;
+  const textY = h / 2 - ink.top - ink.height / 2;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${defs}
     <rect width="${w}" height="${h}" fill="url(#bg)"/>
-    <ellipse cx="${cx}" cy="${h / 2}" rx="${h * 0.6}" ry="${h * 0.6}" fill="url(#glow)"/>
-    <g transform="translate(${cx - e / 2} ${(h - e) / 2}) scale(${e / 120})">${emblem}</g>
-    <text x="${textX}" y="${h * 0.5 + h * 0.075}" textLength="${textW}" lengthAdjust="spacing" font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif" font-weight="700" font-size="${h * 0.2}" fill="#F4F6F8">ATLAS</text>
+    <ellipse cx="${x0 + e / 2}" cy="${h / 2}" rx="${h * 0.6}" ry="${h * 0.6}" fill="url(#glow)"/>
+    <g transform="translate(${x0} ${(h - e) / 2}) scale(${e / 120})">${emblem}</g>
+    <g transform="translate(${textX} ${textY})">${wordmark(size)}</g>
   </svg>`;
 }
 
@@ -101,9 +116,15 @@ for (const [d, px] of Object.entries(densities)) {
 await png(icon(512), join(brand, 'android/play-store-512.png'));
 
 // Android TV launcher banner (xhdpi 320×180) and Fire TV icons
-await png(banner(320, 180), join(brand, 'android-tv/banner-320x180.png'));
-await png(banner(640, 360), join(brand, 'android-tv/banner-640x360.png'));
-await png(banner(1280, 720), join(brand, 'fire-tv/app-icon-1280x720.png'));
+await png(await banner(320, 180), join(brand, 'android-tv/banner-320x180.png'));
+await png(await banner(640, 360), join(brand, 'android-tv/banner-640x360.png'));
+await png(await banner(1280, 720), join(brand, 'fire-tv/app-icon-1280x720.png'));
+
+// The same banner straight into the Android app. It is also the TV launcher icon
+// (values-television/launcher.xml), because Fire TV ignores android:banner for sideloaded apps.
+const androidRes = join(root, 'apps/android/app/src/main/res');
+await png(await banner(320, 180), join(androidRes, 'drawable-xhdpi/banner.png'));
+await png(await banner(640, 360), join(androidRes, 'drawable-xxxhdpi/banner.png'));
 await png(icon(512), join(brand, 'fire-tv/app-icon-512.png'));
 
 // Splash / loading screen

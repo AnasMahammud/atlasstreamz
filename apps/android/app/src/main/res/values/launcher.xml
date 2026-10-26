@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher activity icon. Phones and tablets get the normal round app icon;
+         values-television swaps in the wide banner for TVs. -->
+    <drawable name="launcher_tile">@mipmap/ic_launcher</drawable>
+</resources>

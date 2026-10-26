@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,24 +33,38 @@ function trustProxySetting(raw: string | undefined): boolean | number {
   return Number.isInteger(n) && n > 0 ? n : false;
 }
 
+/**
+ * Render sets RENDER=true. There the safe settings are the defaults, so a service whose
+ * environment variables are missing still binds publicly, can't be claimed without a setup
+ * code, and keeps its data on the mounted disk.
+ */
+const onRender = env('RENDER') === 'true';
+const flag = (key: string, hostedDefault: boolean) => (env(key) ?? (onRender ? String(hostedDefault) : 'false')) === 'true';
+const renderDisk = onRender && existsSync('/var/data') ? '/var/data/atlas' : undefined;
+
 export const config = {
-  host: env('ATLAS_HOST') ?? '127.0.0.1',
+  // A platform-assigned PORT means we must listen on all interfaces to be reachable.
+  host: env('ATLAS_HOST') ?? (env('PORT') ? '0.0.0.0' : '127.0.0.1'),
   // Hosting platforms (Render, Railway, Fly…) assign the port through PORT.
   port: Number(env('ATLAS_PORT') ?? env('PORT') ?? 4870),
-  trustProxy: trustProxySetting(env('ATLAS_TRUST_PROXY')),
+  trustProxy: trustProxySetting(env('ATLAS_TRUST_PROXY') ?? (onRender ? '1' : undefined)),
   /** Mark the session cookie Secure. Required when served over HTTPS. */
-  secureCookies: env('ATLAS_SECURE_COOKIES') === 'true',
+  secureCookies: flag('ATLAS_SECURE_COOKIES', true),
   /**
    * One-time setup code. When set, creating the owner account requires it, so a publicly
-   * reachable server can't be claimed by whoever finds the URL first.
+   * reachable server can't be claimed by whoever finds the URL first. On Render a code is
+   * generated (and printed to the logs) if none was configured; see below.
    */
   setupToken: env('ATLAS_SETUP_TOKEN') || undefined,
+  /** True when the setup code was generated here rather than configured. */
+  setupTokenGenerated: false,
   /**
    * Internet-facing deployment. Upstream fetches (playlists, guides, streams, artwork) may then
    * only reach public addresses, so members can't use the server to probe its private network.
    */
-  publicMode: env('ATLAS_PUBLIC') === 'true',
-  dataDir: resolve(env('ATLAS_DATA_DIR') ?? join(repoRoot, 'data')),
+  publicMode: flag('ATLAS_PUBLIC', true),
+  onRender,
+  dataDir: resolve(env('ATLAS_DATA_DIR') ?? renderDisk ?? join(repoRoot, 'data')),
   webDist: join(repoRoot, 'apps/web/dist'),
   initialProvider: {
     url: env('ATLAS_INITIAL_M3U_URL'),
@@ -67,3 +82,12 @@ export const config = {
 
 mkdirSync(config.dataDir, { recursive: true });
 mkdirSync(join(config.dataDir, 'images'), { recursive: true });
+
+// Internet-facing without a configured setup code: create one and keep it with the data, so
+// it survives restarts and the server still can't be claimed by a stranger.
+if (config.publicMode && !config.setupToken) {
+  const file = join(config.dataDir, 'setup-code.txt');
+  if (!existsSync(file)) writeFileSync(file, randomBytes(9).toString('base64url'), { mode: 0o600 });
+  config.setupToken = readFileSync(file, 'utf8').trim();
+  config.setupTokenGenerated = true;
+}

@@ -73,8 +73,16 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(false);
+        // Lay the page out at the device width and never zoom it: "overview mode" shrank the
+        // whole interface on Fire TV, and pinch zoom isn't wanted in an app.
         s.setUseWideViewPort(true);
-        s.setLoadWithOverviewMode(true);
+        s.setLoadWithOverviewMode(false);
+        s.setSupportZoom(false);
+        s.setBuiltInZoomControls(false);
+        s.setDisplayZoomControls(false);
+        // Ignore the system font-size setting so TV layouts don't overflow.
+        s.setTextZoom(100);
+        s.setCacheMode(WebSettings.LOAD_DEFAULT);
         // The web app reads this to pick its TV (remote-first) or touch layout.
         s.setUserAgentString(s.getUserAgentString() + " AtlasApp/" + BuildConfig.VERSION_NAME + (tv ? " (TV)" : " (Mobile)"));
 

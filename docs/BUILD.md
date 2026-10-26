@@ -66,6 +66,7 @@ What happens on Render:
 
 - **Your provider link is never in the repository.** It is stored by Render as an encrypted environment variable, then imported once into the owner account's encrypted database on the disk. Other accounts can't use it; each person adds their own source.
 - **Claiming the server needs a setup code.** The deploy script generates `ATLAS_SETUP_TOKEN` and shows it to you (it's also in `deploy.local.json` and under *atlas → Environment* in Render). The first-run screen asks for it, so nobody who stumbles on the URL can create the owner account before you.
+- **Safe even if settings go missing.** On Render the server itself defaults to listening on all interfaces, secure cookies, proxy trust and public-network protection, and uses the disk at `/var/data` when one is mounted. If no setup code is configured it generates one, keeps it with the data and prints it in the Render logs. It also logs a warning when no disk is mounted.
 - HTTPS is provided by Render. Session cookies are marked `Secure`, and sign-in rate limits use the real client IP (`ATLAS_TRUST_PROXY=1`).
 - Use a long owner password: the sign-in page is on the public internet.
 

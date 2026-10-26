@@ -13,7 +13,8 @@ import { IconCheck, IconPlay, IconPlus, IconRefresh } from '../components/Icons.
 
 function DetailBackdrop({ src, poster }: { src?: string; poster?: string }) {
   return (
-    <motion.div className="detail-art" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.9, ease: [0.2, 0, 0, 1] }}>
+    // Opacity only: a scaled backdrop is wider than the screen and widens the page on phones.
+    <motion.div className="detail-art" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, ease: [0.2, 0, 0, 1] }}>
       {src ? <img src={art(src, backdropSize())} alt="" referrerPolicy="no-referrer" /> : poster ? <img src={art(poster, 'w780')} alt="" className="poster-as-backdrop" referrerPolicy="no-referrer" /> : null}
     </motion.div>
   );

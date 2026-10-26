@@ -14,6 +14,7 @@ export function art(url: string | undefined | null, size: Size = 'w342'): string
 /** Device-aware backdrop size: TVs and phones don't need 1280px blurred backgrounds. */
 export function backdropSize(): Size {
   const w = window.innerWidth * Math.min(2, window.devicePixelRatio || 1);
-  if (document.documentElement.dataset.device === 'tv') return 'w1280';
+  // TVs: 780px backdrops look sharp from the sofa and use a third of the memory of 1280px.
+  if (document.documentElement.dataset.device === 'tv') return 'w780';
   return w > 1600 ? 'original' : w > 900 ? 'w1280' : 'w780';
 }

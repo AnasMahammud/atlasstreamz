@@ -22,6 +22,9 @@ applyAppearance(useUi.getState().appearance);
 trackInputMode();
 installSpatialNavigation();
 
+// iOS Safari ignores user-scalable=no; block its pinch gestures directly.
+for (const type of ['gesturestart', 'gesturechange']) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+
 // Hooks for the ATLAS Android app: its Back key, and returning from the native player.
 Object.assign(window, {
   __atlasBack: () => nativeBack(),

@@ -86,18 +86,62 @@ function zoneOf(el: Element | null): HTMLElement | null {
   return (el?.closest('[data-focus-zone]') as HTMLElement | null) ?? null;
 }
 
+/** The last focused element outside the TV side menu, to return to when leaving it. */
+let lastContentFocus: HTMLElement | null = null;
+
 export function focusElement(el: HTMLElement | null | undefined, opts: { scroll?: boolean } = {}): boolean {
   if (!el) return false;
   el.focus({ preventScroll: true });
   if (document.activeElement !== el) return false;
   const zone = zoneOf(el);
   if (zone?.dataset.focusZone) zoneMemory.set(zone.dataset.focusZone, el);
+  if (!el.closest('[data-rail]')) lastContentFocus = el;
   if (opts.scroll !== false) revealElement(el);
   return true;
 }
 
+const isTv = () => document.documentElement.dataset.device === 'tv';
+
+/**
+ * TV scrolling: instant and predictable. The focused card is pinned to the left of its row
+ * and the focused row sits near the top of the screen, so the remote never "loses" focus and
+ * a weak TV doesn't have to animate long smooth scrolls. Uses the plain numeric scroll APIs,
+ * which every TV WebView supports.
+ */
+function revealOnTv(el: HTMLElement): void {
+  if (el.closest('[data-rail]')) return;
+  const shelf = el.closest<HTMLElement>('[data-shelf]');
+  if (shelf) {
+    const pad = parseFloat(getComputedStyle(shelf).paddingLeft) || 0;
+    shelf.scrollLeft = Math.max(0, el.offsetLeft - pad);
+  }
+  const scroller = el.closest<HTMLElement>('[data-scroll-y]');
+  if (scroller) {
+    const r = el.getBoundingClientRect();
+    const sr = scroller.getBoundingClientRect();
+    if (r.top < sr.top + 20 || r.bottom > sr.bottom - 20) scroller.scrollTop += r.top - sr.top - sr.height * 0.3;
+    return;
+  }
+  if (el.closest('[data-reveal-top]')) {
+    window.scrollTo(0, 0);
+    return;
+  }
+  const vh = window.innerHeight;
+  const row = el.closest<HTMLElement>('section, .vgrid-row, .guide-row, .page-header, .chip-rail') ?? el;
+  const rowTop = row.getBoundingClientRect().top;
+  const r = el.getBoundingClientRect();
+  // Keep the whole row, title included, comfortably on screen.
+  if (rowTop < vh * 0.08 || r.bottom > vh * 0.92) {
+    window.scrollTo(0, Math.max(0, window.scrollY + rowTop - vh * 0.12));
+  }
+  // Fallback for any WebView that ignored the scroll.
+  const after = el.getBoundingClientRect();
+  if (after.bottom < 0 || after.top > vh) el.scrollIntoView({ block: 'center', inline: 'nearest' });
+}
+
 /** Bring the focused element into view: shelves scroll horizontally, the page vertically. */
 export function revealElement(el: HTMLElement): void {
+  if (isTv()) return revealOnTv(el);
   const shelf = el.closest<HTMLElement>('[data-shelf]');
   const smooth = document.documentElement.dataset.motion === 'reduced' ? 'auto' : 'smooth';
   if (shelf) {
@@ -143,10 +187,17 @@ export function move(dir: Dir): boolean {
   }
   const from = current.getBoundingClientRect();
   const currentZone = zoneOf(current);
+  // TV side menu: Up/Down stay inside it (or inside the page); only Left enters it and only
+  // Right leaves it, like the Fire TV / Android TV home screens.
+  const rail = document.querySelector<HTMLElement>('[data-rail]');
+  const inRail = !!rail && rail.contains(current);
+  if (inRail && dir === 'left') return true;
   let best: HTMLElement | null = null;
   let bestScore = Infinity;
   for (const el of list) {
     if (el === current) continue;
+    if (rail && (dir === 'up' || dir === 'down') && rail.contains(el) !== inRail) continue;
+    if (inRail && dir === 'right' && rail!.contains(el)) continue;
     const s = score(dir, from, el.getBoundingClientRect());
     if (s < bestScore) {
       bestScore = s;
@@ -154,11 +205,21 @@ export function move(dir: Dir): boolean {
     }
   }
   if (!best) return false;
-  // Entering a different zone vertically: restore its remembered child if still present.
   const targetZone = zoneOf(best);
-  if ((dir === 'up' || dir === 'down') && targetZone && targetZone !== currentZone) {
-    const remembered = zoneMemory.get(targetZone.dataset.focusZone!);
-    if (remembered && targetZone.contains(remembered) && list.includes(remembered)) best = remembered;
+  if (targetZone && targetZone !== currentZone) {
+    // Zones with a fixed entry point (the TV side menu lands on the current page).
+    const entry = targetZone.dataset.focusEnter ? targetZone.querySelector<HTMLElement>(targetZone.dataset.focusEnter) : null;
+    if (entry && list.includes(entry)) best = entry;
+    // Entering a different zone vertically: restore its remembered child if still present.
+    else if (dir === 'up' || dir === 'down') {
+      const remembered = zoneMemory.get(targetZone.dataset.focusZone!);
+      if (remembered && targetZone.contains(remembered) && list.includes(remembered)) best = remembered;
+    }
+  }
+  // Leaving the TV side menu to the right: return to where you were on the page.
+  if (dir === 'right' && currentZone?.hasAttribute('data-rail')) {
+    const back = lastContentFocus && document.contains(lastContentFocus) && list.includes(lastContentFocus) ? lastContentFocus : null;
+    if (back) best = back;
   }
   return focusElement(best);
 }

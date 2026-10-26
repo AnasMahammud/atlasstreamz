@@ -11,7 +11,9 @@ export function Startup({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<'run' | 'out'>('run');
   const seen = storageGet('atlas.introSeen', false);
   const reduced = prefersReducedMotion();
-  const total = reduced ? 450 : seen ? 1150 : 2700;
+  // TVs always get the short version without blur effects.
+  const tv = document.documentElement.dataset.device === 'tv';
+  const total = reduced ? 450 : seen || tv ? 1150 : 2700;
 
   useEffect(() => {
     storageSet('atlas.introSeen', true);
@@ -34,7 +36,7 @@ export function Startup({ onDone }: { onDone: () => void }) {
   }, [onDone, total]);
 
   return (
-    <div className={`startup ${phase} ${reduced ? 'reduced' : seen ? 'quick' : 'full'}`} role="img" aria-label="ATLAS">
+    <div className={`startup ${phase} ${reduced ? 'reduced' : seen || tv ? 'quick' : 'full'} ${tv ? 'tv' : ''}`} role="img" aria-label="ATLAS">
       <div className="startup-glow" />
       <div className="startup-mark">
         <AtlasEmblem size={168} draw />

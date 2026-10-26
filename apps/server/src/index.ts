@@ -2,6 +2,7 @@ import { openDb } from './db.ts';
 import { config } from './config.ts';
 import { log } from './log.ts';
 import { ensureInitialProvider, listProviders } from './providers.ts';
+import { hasOwner } from './auth.ts';
 import { SyncManager } from './sync/manager.ts';
 import { CatalogSearch, heroEnrichmentCandidates, invalidateGuideCoverage, movieDetails } from './catalog.ts';
 import { buildApp } from './app.ts';
@@ -31,6 +32,12 @@ const app = await buildApp({ db, sync, search });
 await app.listen({ host: config.host, port: config.port });
 log.info(`ATLAS server listening on http://${config.host}:${config.port}`);
 log.info(`${listProviders(db).length} provider(s) configured`);
+if (config.setupTokenGenerated && !hasOwner(db)) {
+  log.info(`Setup code: ${config.setupToken}  (enter it on the website to create the owner account; set ATLAS_SETUP_TOKEN to choose your own)`);
+}
+if (config.onRender && !config.dataDir.startsWith('/var/data')) {
+  log.warn('No disk mounted at /var/data: accounts, profiles and history will be lost on restart. Add a 1 GB disk at /var/data in Render.');
+}
 sync.start();
 void enrichHero();
 

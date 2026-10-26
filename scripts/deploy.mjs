@@ -327,8 +327,16 @@ const repoAccessError = (status, message) => status < 500 && /repo|git|github|ac
  * build/start commands, and every setting ATLAS needs. Then deploy with a clean build cache.
  */
 async function reconcileAndDeploy(key, svc, repoHttps, state) {
-  if (!sameRepo(svc.repo, repoHttps) || svc.branch !== 'main') {
-    step(`Pointing Render service "${svc.name}" at ${repoHttps} (it was using ${svc.repo || 'no repository'})`);
+  const details = svc.serviceDetails ?? {};
+  const commands = details.envSpecificDetails ?? {};
+  const wrongRepo = !sameRepo(svc.repo, repoHttps) || svc.branch !== 'main';
+  const wrongCommands = commands.buildCommand !== BUILD_COMMAND || commands.startCommand !== START_COMMAND || details.healthCheckPath !== '/api/status';
+  if (wrongRepo || wrongCommands) {
+    step(
+      wrongRepo
+        ? `Pointing Render service "${svc.name}" at ${repoHttps} (it was using ${svc.repo || 'no repository'})`
+        : `Correcting the build and start commands of Render service "${svc.name}"`,
+    );
     for (;;) {
       const r = await render(key, 'PATCH', `/services/${svc.id}`, {
         repo: repoHttps,
@@ -347,7 +355,7 @@ async function reconcileAndDeploy(key, svc, repoHttps, state) {
       }
       fail(`Render couldn’t update the service: ${message}`);
     }
-    ok('Render service now builds from the right repository');
+    ok(wrongRepo ? 'Render service now builds from the right repository' : 'Render build and start commands corrected');
   }
 
   const list = await render(key, 'GET', `/services/${svc.id}/env-vars?limit=100`);

@@ -413,9 +413,19 @@
 
 /* ───────────── Rows (shelves) ───────────── */
 
+/* minmax(0, 1fr): a shelf must never widen the page to its content width. Without it the
+   grid track grows to every card in the row, phones zoom the page out to fit, and shelves
+   can't scroll horizontally. */
 .rows {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--row-gap);
+}
+.rows > *,
+.shell main,
+.detail-rows,
+.episodes {
+  min-width: 0;
 }
 .row-head {
   display: flex;
@@ -799,4 +809,177 @@
 }
 .banner .grow strong {
   color: var(--text);
+}
+
+/* ───────────── TV: side menu ───────────── */
+
+.side-rail {
+  position: fixed;
+  z-index: 120;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--rail-w);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.2rem;
+  padding: 1.6rem 0.9rem;
+  background: linear-gradient(90deg, rgba(8, 10, 14, 0.96) 0%, rgba(8, 10, 14, 0.82) 70%, rgba(8, 10, 14, 0) 100%);
+  transition: width 160ms ease-out;
+  overflow: hidden;
+}
+.side-rail:focus-within {
+  width: var(--rail-w-open);
+  background: linear-gradient(90deg, rgba(8, 10, 14, 0.99) 0%, rgba(8, 10, 14, 0.97) 75%, rgba(8, 10, 14, 0.6) 100%);
+}
+.rail-brand {
+  display: grid;
+  place-items: center;
+  width: calc(var(--rail-w) - 1.8rem);
+  height: 3rem;
+  margin-bottom: 0.6rem;
+}
+.rail-items {
+  display: grid;
+  /* Without minmax(0, 1fr) the hidden labels widen every link far into the page. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+  align-content: start;
+  flex: 1;
+  min-width: 0;
+}
+.rail-link {
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  height: 3.2rem;
+  padding: 0 1rem;
+  border-radius: 1rem;
+  color: rgba(244, 246, 248, 0.62);
+  white-space: nowrap;
+  font-size: 1.05rem;
+  font-weight: 620;
+}
+.rail-link svg {
+  width: 1.55rem;
+  height: 1.55rem;
+  flex: none;
+}
+.rail-link .rail-label {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.side-rail:focus-within .rail-label {
+  opacity: 1;
+}
+.rail-link[aria-current='page'] {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+.rail-link:focus {
+  color: #0b0e13;
+  background: #f4f6f8;
+}
+.rail-profile {
+  padding-left: 0.6rem;
+}
+
+.shell-tv {
+  --rail-w: 5.6rem;
+  --rail-w-open: 17rem;
+  padding-left: var(--rail-w);
+  padding-bottom: 3rem;
+}
+.shell-tv .page {
+  padding-top: 2.4rem;
+}
+.shell-tv .hero {
+  height: 72vh;
+}
+.shell-tv .hero-content {
+  bottom: 22%;
+}
+.shell-tv .detail-content {
+  padding-top: 18vh;
+}
+
+/* ───────────── TV: lightweight rendering (Fire TV sticks, older Android TV) ───────────── */
+
+:root[data-device='tv'] .glass,
+:root[data-device='tv'] .glass-btn,
+:root[data-device='tv'] .chip,
+:root[data-device='tv'] .toast,
+:root[data-device='tv'] .dialog-backdrop,
+:root[data-device='tv'] .ep-play {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+:root[data-device='tv'] .glass::after,
+:root[data-device='tv'] .card-media::after,
+:root[data-device='tv'] .ambient::after,
+:root[data-device='tv'] .skeleton::after {
+  display: none;
+}
+:root[data-device='tv'] .glass {
+  background: rgba(30, 36, 46, 0.94);
+}
+:root[data-device='tv'] .card {
+  will-change: auto;
+  transition: transform 140ms ease-out;
+}
+:root[data-device='tv'] .card:focus,
+:root[data-device='tv'] .card:focus-visible {
+  transform: scale(1.06);
+  z-index: 3;
+}
+:root[data-device='tv'] .card .card-media,
+:root[data-device='tv'] .card:focus .card-media,
+:root[data-device='tv'] .card:focus-visible .card-media {
+  box-shadow: none;
+  transition: none;
+}
+:root[data-device='tv'] .card .card-media::before {
+  transition: none;
+}
+:root[data-device='tv'] .card:focus .card-media::before {
+  box-shadow: inset 0 0 0 3px #fff;
+}
+:root[data-device='tv'] .card-media img {
+  transition: none;
+  opacity: 1;
+}
+:root[data-device='tv'] .glass-btn,
+:root[data-device='tv'] .chip,
+:root[data-device='tv'] .pin-key,
+:root[data-device='tv'] .profile-orb,
+:root[data-device='tv'] .profile-name {
+  will-change: auto;
+  transition: transform 120ms ease-out, background-color 120ms ease-out;
+}
+:root[data-device='tv'] .glass-btn:focus,
+:root[data-device='tv'] .glass-btn:focus-visible {
+  box-shadow: 0 0 0 3px #fff;
+}
+:root[data-device='tv'] .profile-card:focus .profile-orb {
+  box-shadow: 0 0 0 4px #fff;
+}
+:root[data-device='tv'] .profiles-glow {
+  display: none;
+}
+:root[data-device='tv'] .shelf {
+  scroll-snap-type: none;
+  scroll-behavior: auto;
+}
+:root[data-device='tv'] .badge.live::before,
+:root[data-device='tv'] .status-dot.busy {
+  animation: none;
+}
+:root[data-device='tv'] .prog,
+:root[data-device='tv'] .rail-item,
+:root[data-device='tv'] .settings-link,
+:root[data-device='tv'] .menu-item {
+  transition: none;
 }
