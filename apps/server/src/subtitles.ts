@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync,
 import { join } from 'node:path';
 import { cleanTitle, toVtt } from '@atlas/core';
 import { getSetting, setSetting, type DB } from './db.ts';
-import { registerSecret } from './log.ts';
+import { log, registerSecret } from './log.ts';
 import { decrypt, encrypt } from './security.ts';
 
 const API = 'https://api.opensubtitles.com/api/v1';
@@ -23,6 +23,8 @@ const TIMEOUT_MS = 15_000;
 const SESSION_MS = 12 * 3_600_000; // OpenSubtitles tokens last 24 h
 const MAX_FILE_BYTES = 3 * 1024 * 1024;
 const MAX_CACHED = 400;
+
+const USERNAME_NOT_EMAIL = 'Use your OpenSubtitles username, not your email address. It’s shown on your opensubtitles.com profile.';
 
 /** Some languages are split by region on OpenSubtitles. */
 const LANGUAGE_GROUPS: Record<string, string[]> = { pt: ['pt-br', 'pt-pt'], zh: ['zh-cn', 'zh-tw'] };
@@ -171,13 +173,22 @@ export function createSubtitleService(db: DB, dataDir: string, fetchImpl: typeof
       /* empty or non-JSON body */
     }
     if (res.ok) return data;
-    if (res.status === 401 || res.status === 403) throw new SubtitleError('OpenSubtitles didn’t accept the API key or account details. Check them in Settings → Subtitles.', 502, 'auth');
+    // OpenSubtitles' own explanation, e.g. "remember to use your username and not your email".
+    const reason = typeof data?.message === 'string' ? data.message.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+    const endpoint = path.split('?')[0];
+    if (res.status === 401 || res.status === 403 || (res.status === 400 && endpoint === '/login')) {
+      if (/not your email/i.test(reason)) throw new SubtitleError(USERNAME_NOT_EMAIL, 400, 'auth');
+      throw new SubtitleError('OpenSubtitles didn’t accept the API key or account details. Check them in Settings → Subtitles.', 502, 'auth');
+    }
     if (res.status === 406) {
       const reset = typeof data?.reset_time === 'string' ? ` It resets in ${data.reset_time}.` : '';
       throw new SubtitleError(`Today’s OpenSubtitles download allowance is used up.${reset}`, 429, 'quota');
     }
-    if (res.status === 429) throw new SubtitleError('OpenSubtitles is busy. Try again in a few seconds.', 429, 'busy');
-    throw new SubtitleError('OpenSubtitles had a problem with that request. Try again later.', 502);
+    if (res.status === 429) {
+      throw new SubtitleError(endpoint === '/login' ? 'OpenSubtitles allows one sign-in attempt per second. Wait a moment and try again.' : 'OpenSubtitles is busy. Try again in a few seconds.', 429, 'busy');
+    }
+    log.warn(`OpenSubtitles ${opts.method ?? 'GET'} ${endpoint} answered ${res.status}${reason ? `: ${reason}` : ''}`);
+    throw new SubtitleError(`OpenSubtitles couldn’t handle that request (${res.status}${reason ? `: ${reason}` : ''}). Try again later.`, 502);
   }
 
   /** Sign in to the owner's OpenSubtitles account, if one is set, for the account's download allowance. */
@@ -237,6 +248,8 @@ export function createSubtitleService(db: DB, dataDir: string, fetchImpl: typeof
       const apiKey = input.apiKey?.trim() || prev?.apiKey;
       if (!apiKey) throw new SubtitleError('Enter your OpenSubtitles API key.', 400, 'invalid');
       const username = input.username === undefined ? prev?.username : input.username.trim() || undefined;
+      // OpenSubtitles signs in with the username only; an email address is always refused.
+      if (username?.includes('@')) throw new SubtitleError(USERNAME_NOT_EMAIL, 400, 'invalid');
       const password = input.password || (username && username === prev?.username ? prev?.password : undefined);
       if (username && !password) throw new SubtitleError('Enter the password for that OpenSubtitles account.', 400, 'invalid');
       const next: Credentials = { apiKey, username, password };
@@ -246,7 +259,7 @@ export function createSubtitleService(db: DB, dataDir: string, fetchImpl: typeof
         if (username) await signIn(next, true);
         else await call(next, '/discover/popular');
       } catch (err) {
-        if (err instanceof SubtitleError && err.code === 'auth') {
+        if (err instanceof SubtitleError && err.code === 'auth' && err.message !== USERNAME_NOT_EMAIL) {
           throw new SubtitleError(username ? 'OpenSubtitles didn’t accept that API key, username or password.' : 'OpenSubtitles didn’t accept that API key.', 400, 'auth');
         }
         throw err;

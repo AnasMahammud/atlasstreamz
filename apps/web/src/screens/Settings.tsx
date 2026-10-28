@@ -756,6 +756,11 @@ function SubtitlesSection({ run }: { run: Run }) {
           <div className="field">
             <label htmlFor="os-user">OpenSubtitles username (optional)</label>
             <input id="os-user" className="input" autoComplete="off" spellCheck={false} value={user} onChange={(e) => setUsername(e.target.value)} />
+            {user.includes('@') ? (
+              <span className="error">Use your OpenSubtitles username, not your email address. It’s shown on your opensubtitles.com profile.</span>
+            ) : (
+              <span className="hint">Your username, not your email address.</span>
+            )}
           </div>
           <div className="field">
             <label htmlFor="os-pass">OpenSubtitles password</label>
@@ -763,7 +768,7 @@ function SubtitlesSection({ run }: { run: Run }) {
             {error && <span className="error">{error}</span>}
           </div>
           <div>
-            <button className="glass-btn primary" type="submit" disabled={saving || (!configured && !apiKey.trim())}>
+            <button className="glass-btn primary" type="submit" disabled={saving || (!configured && !apiKey.trim()) || user.includes('@')}>
               {saving ? 'Checking with OpenSubtitles…' : configured ? 'Save changes' : 'Connect'}
             </button>
           </div>

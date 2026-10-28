@@ -64,6 +64,10 @@ const fakeFetch = (async (input: string | URL, init: RequestInit = {}) => {
   if (path === '/discover/popular') return json(200, { data: [] });
   if (path === '/login') {
     if (call.body?.username === OS_USER && call.body?.password === OS_PASS) return json(200, { token: 'jwt-token', base_url: 'vip-api.opensubtitles.com', user: { allowed_downloads: 20 } });
+    // The real API answers 400 (not 401) when an email address is used as the username.
+    if (String(call.body?.username).includes('.example')) {
+      return json(400, { message: 'Error, invalid username/password   - remember to use your username and not your email to authenticate', status: 400 });
+    }
     return json(401, { message: 'Error, invalid username/password' });
   }
   if (path === '/infos/user') return json(200, { data: { allowed_downloads: 20, remaining_downloads: 19 } });
@@ -197,6 +201,10 @@ describe('OpenSubtitles settings', () => {
     expect(badKey.json).toMatchObject({ code: 'auth', error: 'OpenSubtitles didn’t accept that API key.' });
     const badLogin = await owner({ method: 'PUT', url: '/api/settings/subtitles', body: { apiKey: API_KEY, username: OS_USER, password: 'nope' } });
     expect(badLogin.json.code).toBe('auth');
+    // Email addresses are refused by OpenSubtitles; say so instead of a vague error.
+    const email = await owner({ method: 'PUT', url: '/api/settings/subtitles', body: { apiKey: API_KEY, username: 'me@mail.com', password: OS_PASS } });
+    expect(email.status).toBe(400);
+    expect(email.json.error).toContain('username, not your email');
     expect((await owner({ url: '/api/settings/subtitles' })).json.configured).toBe(false);
 
     const ok = await owner({ method: 'PUT', url: '/api/settings/subtitles', body: { apiKey: API_KEY, username: OS_USER, password: OS_PASS } });
@@ -301,6 +309,11 @@ describe('searching and downloading', () => {
     expect((await owner({ method: 'POST', url: '/api/subtitles/download', body: { fileId: 'x' } })).status).toBe(400);
     expect((await owner({ url: '/api/subtitles/file/999.vtt' })).status).toBe(404);
     expect((await owner({ url: '/api/subtitles/file/..%2Fsecret.key' })).status).toBe(404);
+  });
+
+  it('passes on OpenSubtitles’ own reason when it answers unexpectedly', async () => {
+    const down = createSubtitleService(db, dataDir, (async () => json(503, { message: 'Service unavailable' })) as typeof fetch);
+    await expect(down.search({ kind: 'movie', title: 'Superman', tmdbId: '1061474' }, 'en')).rejects.toThrow('(503: Service unavailable)');
   });
 
   it('can be switched off again', async () => {
