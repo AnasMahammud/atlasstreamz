@@ -8,6 +8,7 @@ import type { DB } from './db.ts';
 import { getSetting, setSetting } from './db.ts';
 import { config } from './config.ts';
 import { log } from './log.ts';
+import { createSubtitleService, SubtitleError, type SearchTarget, type SubtitleService } from './subtitles.ts';
 import {
   AVATARS,
   SESSION_COOKIE,
@@ -86,6 +87,8 @@ interface Ctx {
   db: DB;
   sync: SyncManager;
   search: CatalogSearch;
+  /** Online subtitles; tests pass one with a stand-in for the OpenSubtitles API. */
+  subtitles?: SubtitleService;
 }
 
 class HttpError extends Error {
@@ -108,6 +111,7 @@ const MAX_SOURCES = 5;
 
 export async function buildApp(ctx: Ctx) {
   const { db, sync, search } = ctx;
+  const subtitles = ctx.subtitles ?? createSubtitleService(db, config.dataDir);
   // A hop count trusts only the nearest N proxies, so a client can't spoof X-Forwarded-For.
   const hops = config.trustProxy;
   const trustProxy = typeof hops === 'number' ? (_address: string, hop: number) => hop < hops : hops;
@@ -137,6 +141,7 @@ export async function buildApp(ctx: Ctx) {
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof HttpError) return reply.code(err.status).send({ error: err.message, ...err.extra });
+    if (err instanceof SubtitleError) return reply.code(err.status).send({ error: err.message, code: err.code });
     if ((err as any).validation || (err as any).statusCode === 400) return reply.code(400).send({ error: 'Invalid request.' });
     log.error(`${req.method} ${req.url}`, err);
     return reply.code(500).send({ error: 'Something went wrong on the ATLAS server.' });
@@ -982,7 +987,86 @@ export async function buildApp(ctx: Ctx) {
       },
       verified: verified ? { width: verified.width, height: verified.height } : undefined,
       autoplayNext: prefsOf(p).autoplayNext !== false,
+      onlineSubtitles: parsed.kind !== 'live' && subtitles.configured(),
+      subtitleLang: prefsOf(p).subtitleLang,
     };
+  });
+
+  /* ---------------- online subtitles (OpenSubtitles) ---------------- */
+
+  // Everyone on the server shares the owner's OpenSubtitles allowance, so cap each account.
+  const subtitleUse = new Map<string, number[]>();
+  const limitSubtitles = (req: FastifyRequest, kind: 'search' | 'download') => {
+    const key = `${kind}:${needSession(req).accountId}`;
+    const now = Date.now();
+    const recent = (subtitleUse.get(key) ?? []).filter((t) => now - t < 3_600_000);
+    if (recent.length >= (kind === 'search' ? 120 : 40)) throw new HttpError(429, 'Too many subtitle requests. Try again in a while.');
+    recent.push(now);
+    subtitleUse.set(key, recent);
+  };
+
+  const subtitleTarget = (id: string, kind: string): SearchTarget => {
+    if (kind === 'movie') {
+      const m = db.prepare('SELECT title, year, tmdb_id FROM movies WHERE id = ?').get(id) as { title: string; year: number | null; tmdb_id: string | null } | undefined;
+      if (m) return { kind: 'movie', title: m.title, year: m.year, tmdbId: m.tmdb_id };
+    } else if (kind === 'episode') {
+      const e = db
+        .prepare('SELECT e.season, e.episode, s.title, s.year, s.tmdb_id FROM episodes e JOIN series s ON s.id = e.series_id WHERE e.id = ?')
+        .get(id) as { season: number; episode: number; title: string; year: number | null; tmdb_id: string | null } | undefined;
+      if (e) return { kind: 'episode', seriesTitle: e.title, year: e.year, seriesTmdbId: e.tmdb_id, season: e.season, episode: e.episode };
+    }
+    throw new HttpError(404, 'Online subtitles aren’t available for this title.');
+  };
+
+  app.get('/api/subtitles/search', async (req) => {
+    const p = needProfile(req);
+    const { id, lang } = q<{ id?: string; lang?: string }>(req);
+    if (!id) throw bad('Choose a title.');
+    const parsed = assertOwnsContent(req, id);
+    const card = lookupCards(db, [id]).get(id);
+    if (card?.categoryId) assertAllowed(req, card);
+    const target = subtitleTarget(id, parsed.kind);
+    limitSubtitles(req, 'search');
+    const language = lang ?? prefsOf(p).subtitleLang ?? 'en';
+    const { results, match } = await subtitles.search(target, language);
+    return { language: language || 'all', match, results };
+  });
+
+  app.post('/api/subtitles/download', async (req) => {
+    needProfile(req);
+    const fileId = Number(body<{ fileId?: unknown }>(req).fileId);
+    if (!Number.isSafeInteger(fileId) || fileId <= 0) throw bad('Choose subtitles to download.');
+    if (!subtitles.cached(fileId)) limitSubtitles(req, 'download');
+    const result = await subtitles.download(fileId);
+    return { url: `/api/subtitles/file/${fileId}.vtt`, remaining: result.remaining };
+  });
+
+  app.get('/api/subtitles/file/:name', async (req, reply) => {
+    needSession(req);
+    const m = /^(\d{1,12})\.vtt$/.exec((req.params as { name: string }).name);
+    const vtt = m ? subtitles.cached(Number(m[1])) : null;
+    if (!vtt) throw new HttpError(404, 'Those subtitles aren’t downloaded. Choose them again from the subtitles menu.');
+    return reply.type('text/vtt; charset=utf-8').header('Cache-Control', 'private, max-age=86400').send(vtt);
+  });
+
+  app.get('/api/settings/subtitles', async (req) => {
+    needOwner(req);
+    return subtitles.status();
+  });
+
+  app.put('/api/settings/subtitles', async (req) => {
+    needOwner(req);
+    needElevation(req);
+    const b = body<{ apiKey?: unknown; username?: unknown; password?: unknown }>(req);
+    const text = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : undefined);
+    return subtitles.save({ apiKey: text(b.apiKey, 200), username: text(b.username, 100), password: text(b.password, 200) });
+  });
+
+  app.delete('/api/settings/subtitles', async (req) => {
+    needOwner(req);
+    needElevation(req);
+    subtitles.clear();
+    return { configured: false };
   });
 
   /** Recovery helper: is the network/provider/auth OK? Lets the player show a useful message. */

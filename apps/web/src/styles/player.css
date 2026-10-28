@@ -367,6 +367,47 @@
 .menu-meta {
   padding: 0.6rem 0.9rem 0.3rem;
 }
+.menu-meta.error {
+  color: var(--danger, #ff8a80);
+}
+
+/* OpenSubtitles results: language badge, release name, then downloads and flags. */
+.sub-result {
+  align-items: flex-start;
+}
+.sub-result[aria-busy='true'] {
+  background: rgba(255, 255, 255, 0.1);
+}
+.sub-result:disabled:not([aria-busy='true']) {
+  opacity: 0.55;
+}
+.sub-lang {
+  flex: none;
+  min-width: 2.4rem;
+  margin-top: 0.1rem;
+  padding: 0.12rem 0.35rem;
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+.sub-text {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.sub-release {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sub-meta {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-3);
+}
 
 /* Live banner, mini guide, up next */
 .channel-banner {

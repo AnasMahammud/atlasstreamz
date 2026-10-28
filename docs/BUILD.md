@@ -6,6 +6,7 @@
 | PWA install | Manifest, icons and service worker in place | Same build |
 | TV browsers (Android TV / Fire TV / smart TVs) | Remote-first TV mode works in Chromium | Same build; needs on-device validation |
 | Android phone / tablet, Android TV, Fire TV | **Built**: one signed APK (WebView interface + native Media3 player) | Yes, `dist\ATLAS.apk` via `apps\android\build-apk.bat`. Not yet run on a device; see [ANDROID.md](ANDROID.md) |
+| LG webOS TV (webOS 5+) | **Built**: IPK launcher that opens your server in TV mode; web build carries fallbacks for old TV browsers | Yes, `dist\ATLAS.ipk` via `apps\webos\build-webos.bat`. Not yet run on a TV; see [WEBOS.md](WEBOS.md) |
 | iOS / iPadOS IPA | **Not built** | No — requires macOS + Xcode or EAS cloud build with an Apple Developer account |
 
 The Android APK is built (see [ANDROID.md](ANDROID.md)). No AAB (Play Store bundle) or iOS IPA has been produced. The iOS section below is a plan with exact requirements, not a completed build.

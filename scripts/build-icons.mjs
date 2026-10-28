@@ -127,6 +127,12 @@ await png(await banner(320, 180), join(androidRes, 'drawable-xhdpi/banner.png'))
 await png(await banner(640, 360), join(androidRes, 'drawable-xxxhdpi/banner.png'));
 await png(icon(512), join(brand, 'fire-tv/app-icon-512.png'));
 
+// LG webOS TV app: launcher icons (80 and 130 px, square, no transparency) and the launch splash
+const webos = join(root, 'apps/webos/app');
+await png(icon(80, { rounded: false }), join(webos, 'icon.png'));
+await png(icon(130, { rounded: false }), join(webos, 'largeIcon.png'));
+await png(await banner(1920, 1080), join(webos, 'splash.png'));
+
 // Splash / loading screen
 await png(
   `<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="2048">${defs}<rect width="2048" height="2048" fill="#080A0E"/><circle cx="1024" cy="1024" r="700" fill="url(#glow)"/><g transform="translate(784 744) scale(4)">${emblem}</g></svg>`,

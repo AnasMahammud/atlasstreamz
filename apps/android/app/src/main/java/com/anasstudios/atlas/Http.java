@@ -12,6 +12,13 @@ import java.nio.charset.StandardCharsets;
 final class Http {
     private Http() {}
 
+    /** The server answered with an error; the message is written for the viewer. */
+    static final class ServerError extends IOException {
+        ServerError(String message) {
+            super(message);
+        }
+    }
+
     static String request(String method, String url, String jsonBody, String cookie) throws IOException {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setRequestMethod(method);
@@ -41,7 +48,15 @@ final class Http {
             }
         }
         c.disconnect();
-        if (code >= 400) throw new IOException("HTTP " + code);
+        if (code >= 400) {
+            String message = null;
+            try {
+                message = new org.json.JSONObject(body).optString("error", null);
+            } catch (Exception ignored) {
+                // Not an ATLAS error response.
+            }
+            throw message != null && !message.isEmpty() ? new ServerError(message) : new IOException("HTTP " + code);
+        }
         return body;
     }
 }

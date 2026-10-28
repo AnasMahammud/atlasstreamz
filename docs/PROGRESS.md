@@ -1,9 +1,12 @@
 # ATLAS — progress and handoff
 
-Last updated: 25 October 2026 (phone zoom and Fire TV fixes, APK 0.3.0). "Verified" means exercised in this session against your real provider (9,876 live channels, 16,200 movies, 3,523 series, ~54,500 guide listings) in desktop Chromium, or covered by automated tests. Anything else is marked as unverified.
+Last updated: 26 October 2026 (LG webOS app, older-TV browser support). "Verified" means exercised in this session against your real provider (9,876 live channels, 16,200 movies, 3,523 series, ~54,500 guide listings) in desktop Chromium, or covered by automated tests. Anything else is marked as unverified.
 
 ## New in this round
 
+- **Online subtitles (OpenSubtitles).** The owner adds an OpenSubtitles API key, and optionally their account for its daily download allowance, in Settings → Subtitles (stored encrypted, never sent to devices). In the player, Subtitles → "Find subtitles online" lists matches in the profile's language (other languages one press away), found by the title's TMDB ID or, failing that, by name with the matched title shown for checking. The chosen file is converted to WebVTT and switched on; downloads are cached on the server so replays don't use the allowance. Works in the web player (desktop, phone, LG) and the Android app ("Find subtitles" button or the remote's Menu key; APK 0.3.2). OpenSubtitles.org's old API is retired, so this uses its successor at opensubtitles.com (same library).
+- **LG webOS TVs.** `dist\ATLAS.ipk` (built by `apps\webos\build-webos.bat`, installed by `apps\webos\install-webos.bat` on a TV in Developer Mode) opens your ATLAS server in TV mode, like the Android app. It covers webOS 5 (2020) onwards. The remote's Back, media and channel keys work; Back from the first screens returns to the TV home; the Magic Remote pointer selects items. The launcher waits through a sleeping Render server and asks for another address if it can't connect. See [WEBOS.md](WEBOS.md).
+- **Older TV browsers.** LG webOS 5, 6 and 22 run Chromium 68, 79 and 87, which lack `aspect-ratio`, flex `gap`, `clamp()`, `:focus-visible` and newer JavaScript. The web build now adds fallbacks for them (`apps/web/legacy-css.mjs`, `styles/legacy.css`, syntax compiled for Chromium 68 plus small polyfills); modern browsers are unaffected. Verified: no syntax newer than Chromium 68 in any chunk; in a simulation of Chromium 68's CSS at 1920×1080, Home, Movies and Live TV keep their layout, card shapes and spacing and the remote focus ring works; desktop and phone layouts unchanged; 9 new tests. **Not yet run on a real LG TV.**
 - **Phones: no more miniature layout or pinch zoom.** Every row's grid track had stretched to its shelf's full width (5,778 px), so phones zoomed out to fit it. Rows are now capped at the screen width, the viewport is locked (no pinch or double-tap zoom, including iOS Safari), and text keeps a 16 px base. Verified at 375 px on all 13 screens in the browser pane.
 - **Fire TV / Android TV: side menu, smooth scrolling, lighter rendering.** TV mode has a left side menu (Search, Home, Live TV, Guide, Movies, TV Shows, My List, Settings, profile) that stays on screen and opens when you press Left; Back jumps to it. Moving Down scrolls each row to the top of the screen instantly, and Right returns to the card you left. Blur, shadows, shimmer, ambient backgrounds and page animations are off on TV. The APK no longer uses "overview mode", which shrank the page, and zoom is disabled. Verified with arrow keys at 960×540 in TV mode; **not yet tried on a real Fire TV.**
 - **Separate accounts.** Every person signs up with their own email and password and gets their own profiles, PINs, history, My List, recommendations and content sources. Sign-up is invite-only by default; the owner can switch to open or closed and manage accounts under Settings → Members. Verified with automated tests (an invited friend can't see, search, play or stream the owner's content) and in the browser (invite link → new account → "Create your first profile" → "Connect a content source").
@@ -18,9 +21,9 @@ Last updated: 25 October 2026 (phone zoom and Fire TV fixes, APK 0.3.0). "Verifi
 | 2 Premium interface | **Done for web.** Startup animation, profiles + PIN pad, Home hero + shelves, Liquid Glass components, top glass nav (desktop/TV) and bottom glass nav (mobile), detail pages, Movies/Shows grids, ambient artwork backgrounds. |
 | 3 Provider integration | **Done.** M3U streaming parser, Xtream API (auto-detected from `get.php` links), XMLTV streaming parser, normalisation, 24 h sync with backoff, atomic apply, favourite re-matching. |
 | 4 Streaming player | **Done for web.** HLS (hls.js), MPEG-TS (mpegts.js) and native files; live and VOD; resume; audio, subtitle and quality menus; speed; aspect; PiP; fullscreen; up-next countdown. |
-| 5 Advanced features | **Mostly done.** EPG timeline, typo-tolerant search, My List, PIN security, multi-profile personalisation, content-based recommendations, stream recovery. *Not done:* online subtitle search (needs a subtitle-service API key). |
-| 6 Device optimisation | **Partial.** Responsive mobile and desktop, TV mode with spatial navigation and no live blur, Android APK with native playback. *Not done:* iOS app; testing on real phones, TVs and Fire TV. |
-| 7 Production readiness | **Partial.** Security review of auth flows, 63 automated tests, production build, PWA, Render blueprint and deploy script. *Not done:* native release builds, load testing. |
+| 5 Advanced features | **Done.** EPG timeline, typo-tolerant search, My List, PIN security, multi-profile personalisation, content-based recommendations, stream recovery, online subtitles from OpenSubtitles. |
+| 6 Device optimisation | **Partial.** Responsive mobile and desktop, TV mode with spatial navigation and no live blur, Android APK with native playback, LG webOS app with fallbacks for older TV browsers. *Not done:* iOS app, Samsung Tizen; testing on real phones, TVs, Fire TV and LG TVs. |
+| 7 Production readiness | **Partial.** Security review of auth flows, 72 automated tests, production build, PWA, Render blueprint and deploy script. *Not done:* native release builds, load testing. |
 
 ## Acceptance criteria
 
@@ -36,7 +39,7 @@ Last updated: 25 October 2026 (phone zoom and Fire TV fixes, APK 0.3.0). "Verifi
 | 8 | Open a movie and resume | Verified: progress saved and restored; "Resume" and "From the beginning". |
 | 9 | Browse seasons and episodes | Verified. |
 | 10 | Choose audio and subtitle tracks | Implemented for HLS renditions and native tracks. Your provider's streams tested so far carry one audio track, so switching is unverified against real multi-track content. |
-| 11 | Authorised external subtitles | Local `.srt`/`.vtt` import with styling and sync works. Online lookup is **not implemented**. |
+| 11 | Authorised external subtitles | Local `.srt`/`.vtt` import with styling and sync works. Online search through OpenSubtitles (owner's API key, matched by TMDB ID, name matches labelled for checking) is covered by 16 tests against a stand-in API; search parsing checked against real OpenSubtitles data. **Waiting for your API key** to try end to end. |
 | 12 | Favourites | Verified (My List, favourite channels, kept across syncs). |
 | 13 | Search the catalogue | Verified ("acountant" finds The Accountant, ~70 ms server-side). |
 | 14 | Manual and automatic refresh | Verified manual refresh (13 s, no churn). The 24 h schedule and backoff are covered by unit tests; a real 24 h cycle has not been observed. |
@@ -61,9 +64,9 @@ Last updated: 25 October 2026 (phone zoom and Fire TV fixes, APK 0.3.0). "Verifi
 
 ## Next steps, in order
 
-1. **Install the APK on a real Fire TV / Android TV and phone** and run through the checklist in ANDROID.md. Then an iOS app (needs a Mac or Expo EAS with an Apple Developer account).
+1. **Install the APK on a real Fire TV / Android TV and phone, and the IPK on an LG TV**, and run through the checklists in ANDROID.md and WEBOS.md. Then an iOS app (needs a Mac or Expo EAS with an Apple Developer account).
 2. **On-device validation**: Fire TV Stick and an Android TV box (remote keys, performance), iOS Safari, Android Chrome.
-3. **Online subtitles**: add an OpenSubtitles (or similar) API key to the server and a search endpoint that matches by TMDB/IMDb ID first and asks the user to confirm ambiguous results.
+3. **Online subtitles**: add your OpenSubtitles API key (and account) in Settings → Subtitles, then try "Find subtitles online" in the player.
 4. **Failure-injection tests** for stream recovery (kill upstream mid-stream, 403 from provider, offline toggles).
 5. **Catch-up / timeshift** for channels where the provider advertises `tv_archive` (yours currently reports none).
 

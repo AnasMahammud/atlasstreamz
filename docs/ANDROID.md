@@ -6,6 +6,7 @@ One APK (`dist\ATLAS.apk`) installs on Android phones and tablets (Android 6.0+)
 
 - **Interface**: the ATLAS interface from your ATLAS server, in a WebView. On TVs it switches to the remote-first layout: large focus states, D-pad navigation, no live blur. On phones it uses the touch layout with the bottom bar.
 - **Playback**: native **Media3/ExoPlayer**, with hardware decoding, HLS, MPEG-TS, MP4 and MKV. Embedded audio and subtitle tracks are selectable from the player controls.
+- **Online subtitles**: for movies and episodes, **Find subtitles** (top right while the controls are showing, or the remote's **Menu ☰** key) searches OpenSubtitles through your server, once the owner has added an API key in Settings → Subtitles. Pick a result to switch it on; "Other language" searches again. The player's own subtitle (CC) button then switches between tracks or turns them off.
 - **Remote**: Back closes menus and steps back (and exits from Home). Channel Up/Down, or D-pad Up/Down while controls are hidden, changes channel. Info/Guide shows the channel banner. The next episode plays automatically when your profile allows it.
 - **Security**: video comes through your ATLAS server's proxy using your signed-in session, so your provider password never reaches the device. Only your ATLAS server's pages can use the app's native bridge.
 - **Accounts**: everyone signs in with their own ATLAS account, so profiles, history and sources stay separate per person.

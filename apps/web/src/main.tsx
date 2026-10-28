@@ -9,9 +9,10 @@ import './styles/glass.css';
 import './styles/layout.css';
 import './styles/screens.css';
 import './styles/player.css';
+import './styles/legacy.css';
 import { App } from './App.tsx';
 import { queryClient } from './lib/queries.ts';
-import { detectDevice, trackInputMode } from './lib/device.ts';
+import { detectDevice, flagMissingFlexGap, trackInputMode } from './lib/device.ts';
 import { installSpatialNavigation, nativeBack } from './lib/focus.ts';
 import { applyAppearance, useUi } from './lib/store.ts';
 
@@ -19,6 +20,7 @@ const device = detectDevice();
 document.documentElement.dataset.device = device;
 useUi.getState().setDevice(device);
 applyAppearance(useUi.getState().appearance);
+flagMissingFlexGap();
 trackInputMode();
 installSpatialNavigation();
 

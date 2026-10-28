@@ -15,8 +15,8 @@ android {
         applicationId 'com.anasstudios.atlas'
         minSdk 23
         targetSdk 35
-        versionCode 4
-        versionName '0.3.1'
+        versionCode 5
+        versionName '0.3.2'
         // Optional: bake your server in at build time with -PatlasServer=https://your-atlas.onrender.com
         buildConfigField 'String', 'DEFAULT_SERVER', "\"${project.findProperty('atlasServer') ?: ''}\""
     }

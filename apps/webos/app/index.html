@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATLAS</title>
+<!--
+  ATLAS for LG webOS TVs. This page only finds your ATLAS server and opens it: the interface
+  itself comes from the server (like the Android app), so it updates whenever you deploy.
+  Plain ES5 and old-style CSS so it runs on every webOS version.
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #080A0E; color: #F4F6F8; font-family: "LG Smart UI", "Segoe UI", Helvetica, Arial, sans-serif; overflow: hidden; }
+  body { background: radial-gradient(ellipse at 50% 40%, #1C2636 0%, #0E131B 55%, #080A0E 100%); }
+  .wrap { position: absolute; top: 50%; left: 50%; width: 900px; margin-left: -450px; -webkit-transform: translateY(-50%); transform: translateY(-50%); text-align: center; }
+  .brand { display: inline-block; margin-bottom: 48px; }
+  .brand img { width: 130px; height: 130px; vertical-align: middle; border-radius: 28px; }
+  .brand span { display: inline-block; vertical-align: middle; margin-left: 32px; font-size: 64px; font-weight: 700; letter-spacing: 8px; }
+  .status { font-size: 30px; line-height: 1.4; color: rgba(244, 246, 248, 0.8); min-height: 42px; }
+  .hint { font-size: 24px; color: rgba(244, 246, 248, 0.55); margin-top: 12px; min-height: 34px; }
+  .error { color: #FF8A80; }
+  form { display: none; margin-top: 40px; }
+  form.show { display: block; }
+  label { display: block; font-size: 26px; margin-bottom: 16px; color: rgba(244, 246, 248, 0.75); }
+  input { width: 760px; box-sizing: border-box; font-size: 32px; padding: 20px 28px; border-radius: 18px; border: 3px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.08); color: #F4F6F8; outline: none; }
+  button { margin-top: 28px; font-size: 30px; font-weight: 600; padding: 18px 64px; border-radius: 999px; border: 0; background: rgba(255, 255, 255, 0.14); color: #F4F6F8; outline: none; }
+  input:focus { border-color: #FFFFFF; }
+  button:focus { background: #FFFFFF; color: #080A0E; }
+  .dots span { display: inline-block; width: 14px; height: 14px; margin: 0 6px; border-radius: 50%; background: #81C7FF; opacity: 0.25; -webkit-animation: pulse 1.2s infinite; animation: pulse 1.2s infinite; }
+  .dots span:nth-child(2) { -webkit-animation-delay: 0.2s; animation-delay: 0.2s; }
+  .dots span:nth-child(3) { -webkit-animation-delay: 0.4s; animation-delay: 0.4s; }
+  .dots.hide { display: none; }
+  @-webkit-keyframes pulse { 50% { opacity: 1; } }
+  @keyframes pulse { 50% { opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><img src="largeIcon.png" alt=""><span>ATLAS</span></div>
+  <div class="dots" id="dots"><span></span><span></span><span></span></div>
+  <div class="status" id="status">Connecting…</div>
+  <div class="hint" id="hint"></div>
+  <form id="form" autocomplete="off">
+    <label for="server">Your ATLAS server address</label>
+    <input id="server" type="url" spellcheck="false" placeholder="https://your-atlas.onrender.com">
+    <br>
+    <button id="connect" type="submit">Connect</button>
+  </form>
+</div>
+<script>
+(function () {
+  // Set by scripts/webos.mjs when the app is built. Empty means "ask on first launch".
+  var BUILT_IN_SERVER = '%%ATLAS_SERVER%%';
+  var KEY = 'atlas.server';
+  var BACK = 461;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var form = $('form'), input = $('server'), button = $('connect');
+
+  var builtIn = BUILT_IN_SERVER.indexOf('%%') === 0 ? '' : BUILT_IN_SERVER;
+
+  // The last address that worked, unless this build ships a different built-in one.
+  function saved() {
+    try {
+      if ((localStorage.getItem(KEY + '.builtIn') || '') !== builtIn) return '';
+      return localStorage.getItem(KEY) || '';
+    } catch (e) { return ''; }
+  }
+  function save(v) {
+    try {
+      localStorage.setItem(KEY, v);
+      localStorage.setItem(KEY + '.builtIn', builtIn);
+    } catch (e) { /* storage off */ }
+  }
+
+  /** What the person typed → scheme + host (+ port). */
+  function normalise(raw) {
+    var v = (raw || '').replace(/^\s+|\s+$/g, '');
+    if (!v) return '';
+    if (!/^https?:\/\//i.test(v)) {
+      var local = /^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/|$)/.test(v) || /^localhost/i.test(v) || /^[^\/]+:\d+(\/|$)/.test(v);
+      v = (local ? 'http://' : 'https://') + v;
+    }
+    var m = /^(https?:\/\/[^\/?#]+)/i.exec(v);
+    return m ? m[1].toLowerCase() : '';
+  }
+
+  function say(text, hint, isError) {
+    $('status').textContent = text;
+    $('status').className = 'status' + (isError ? ' error' : '');
+    $('hint').textContent = hint || '';
+  }
+
+  function showForm(value) {
+    $('dots').className = 'dots hide';
+    form.className = 'show';
+    input.value = value || '';
+    button.focus();
+  }
+
+  /**
+   * Load a small image from the server: works without CORS, and waits through a free Render
+   * instance waking up (that can take about a minute).
+   */
+  function open(server) {
+    form.className = '';
+    $('dots').className = 'dots';
+    say('Connecting to ' + server.replace(/^https?:\/\//, '') + '…');
+    var done = false;
+    var slow = setTimeout(function () {
+      if (!done) say('Waking up the server…', 'This can take up to a minute the first time.');
+    }, 4000);
+    var limit = setTimeout(function () { finish(false); }, 90000);
+    var img = new Image();
+    function finish(ok) {
+      if (done) return;
+      done = true;
+      clearTimeout(slow);
+      clearTimeout(limit);
+      img.onload = img.onerror = null;
+      if (ok) {
+        save(server);
+        say('Opening ATLAS…');
+        location.replace(server + '/');
+      } else {
+        say("Couldn't reach " + server.replace(/^https?:\/\//, '') + '.', 'Check the TV is online, or enter a different address.', true);
+        showForm(server);
+      }
+    }
+    img.onload = function () { finish(true); };
+    img.onerror = function () { finish(false); };
+    img.src = server + '/icons/favicon-32.png?launch=' + new Date().getTime();
+  }
+
+  form.onsubmit = function (e) {
+    e.preventDefault();
+    var server = normalise(input.value);
+    if (!server) {
+      say('Enter your ATLAS server address.', 'For example https://your-atlas.onrender.com', true);
+      input.focus();
+      return;
+    }
+    open(server);
+  };
+
+  // Remote: Up/Down between the address and Connect; Back leaves the app.
+  document.addEventListener('keydown', function (e) {
+    var code = e.keyCode;
+    if (code === BACK) {
+      e.preventDefault();
+      var sys = window.webOSSystem || window.PalmSystem;
+      if (sys && sys.platformBack) sys.platformBack();
+      else window.close();
+    } else if (form.className === 'show' && (code === 38 || code === 40)) {
+      e.preventDefault();
+      (code === 38 ? input : button).focus();
+    }
+  });
+
+  var server = saved() || normalise(builtIn);
+  if (server) open(server);
+  else {
+    say('Welcome to ATLAS.', 'Enter the address of your ATLAS server to get started.');
+    showForm('');
+    input.focus();
+  }
+})();
+</script>
+</body>
+</html>

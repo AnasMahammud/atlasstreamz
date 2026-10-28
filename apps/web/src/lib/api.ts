@@ -222,6 +222,36 @@ export interface PlayInfo {
   } | null;
   verified?: { width: number; height: number };
   autoplayNext: boolean;
+  /** The server can search OpenSubtitles for this title. */
+  onlineSubtitles?: boolean;
+  subtitleLang?: string;
+}
+
+export interface SubtitleResult {
+  fileId: number;
+  language: string;
+  release: string;
+  downloads: number;
+  hearingImpaired: boolean;
+  machineTranslated: boolean;
+  trusted: boolean;
+  /** "id": matched by TMDB ID. "title": matched by name only, so `feature` says what it was made for. */
+  match: 'id' | 'title';
+  feature?: string;
+}
+
+export interface SubtitleSearch {
+  language: string;
+  match: 'id' | 'title';
+  results: SubtitleResult[];
+}
+
+export interface SubtitleSettings {
+  configured: boolean;
+  username?: string;
+  remaining?: number;
+  allowed?: number;
+  error?: string;
 }
 
 export class ApiError extends Error {

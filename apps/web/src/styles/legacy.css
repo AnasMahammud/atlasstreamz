@@ -1,0 +1,34 @@
+/*
+ * Older TV browsers: LG webOS 5, 6 and 22 run Chromium 68, 79 and 87, which have no
+ * aspect-ratio. Everything else they lack is handled at build time by legacy-css.mjs.
+ */
+@supports not (aspect-ratio: 1 / 1) {
+  /* Padding sets the shape; the artwork fills it. Badges, overlays and fallbacks are
+     already absolutely positioned. */
+  .poster .card-media,
+  .landscape .card-media,
+  .episode .card-media {
+    height: 0;
+  }
+  .poster .card-media {
+    padding-top: 150%;
+  }
+  .landscape .card-media,
+  .episode .card-media {
+    padding-top: 56.25%;
+  }
+  .poster .card-media > img,
+  .landscape .card-media > img,
+  .episode .card-media > img {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  /* Channel tiles lay their logo and name out in a grid, so they get a fixed height instead. */
+  .channel .card-media {
+    height: calc(var(--channel-w) * 0.625);
+  }
+  .upnext-art {
+    height: 5.625rem;
+  }
+}

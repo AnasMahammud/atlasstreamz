@@ -9,6 +9,7 @@ ATLAS has two parts:
 | **ATLAS server** (`apps/server`) | Runs on a computer in your home. Stores your provider credentials **encrypted**, syncs playlists/EPG every 24 h, serves the catalogue API, and proxies streams so credentials never reach a browser or TV. |
 | **ATLAS web app** (`apps/web`) | The interface. Works in desktop and mobile browsers, installs as a PWA, and has a remote-first TV mode (`?device=tv`, auto-detected on Android TV / Fire TV / smart-TV browsers). |
 | **ATLAS for Android** (`apps/android`) | One APK for phones, Android TV and Fire TV: the ATLAS interface plus a native Media3 player. Build with `apps\android\build-apk.bat`; install guide in [docs/ANDROID.md](docs/ANDROID.md). |
+| **ATLAS for LG webOS** (`apps/webos`) | An IPK for LG TVs (webOS 5 / 2020 onwards) that opens your ATLAS server in TV mode. Build with `apps\webos\build-webos.bat`, install with `apps\webos\install-webos.bat`; guide in [docs/WEBOS.md](docs/WEBOS.md). |
 | **@atlas/core** (`packages/core`) | Platform-neutral logic shared by everything: M3U / Xtream / XMLTV parsing, normalisation, search, recommendations, design tokens. Native apps will reuse it. |
 
 Status: see [docs/PROGRESS.md](docs/PROGRESS.md). Build and platform notes: [docs/BUILD.md](docs/BUILD.md). Why things are the way they are: [docs/DECISIONS.md](docs/DECISIONS.md).

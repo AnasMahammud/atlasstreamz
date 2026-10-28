@@ -3,11 +3,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { backoffDelay, formatClock, qualityFromHeight } from '@atlas/core';
-import { api, ApiError, enc, type Card, type PlayInfo } from '../lib/api.ts';
+import { api, ApiError, enc, type Card, type PlayInfo, type SubtitleResult } from '../lib/api.ts';
 import { attachEngine, type EngineHandle, type FatalKind, type Level, type Track } from '../lib/playback.ts';
 import { shiftTrack, toVtt } from '../lib/subtitles.ts';
 import { art } from '../lib/img.ts';
 import { focusFirst, pushBack } from '../lib/focus.ts';
+import { remoteKey } from '../lib/device.ts';
 import { toast, useUi } from '../lib/store.ts';
 import { useBrowse, useChannel, useStatus } from '../lib/queries.ts';
 import { Img, timeLabel, useNow } from '../components/Primitives.tsx';
@@ -28,14 +29,16 @@ import {
   IconPause,
   IconPip,
   IconPlay,
+  IconSearch,
   IconSettings,
   IconStar,
   IconSubtitles,
   IconUpload,
   IconVolume,
 } from '../components/Icons.tsx';
+import { languageName, OnlineSubtitles } from '../components/OnlineSubtitles.tsx';
 
-type Menu = null | 'audio' | 'subtitles' | 'settings' | 'guide';
+type Menu = null | 'audio' | 'subtitles' | 'subs-online' | 'settings' | 'guide';
 type Failure = { kind: FatalKind | 'offline' | 'provider' | 'expired'; title: string; body: string };
 
 const HIDE_MS = 3500;
@@ -507,30 +510,43 @@ function WebPlayer() {
     setSubSel(sel);
   };
 
-  const importSubtitle = async (file: File) => {
+  /** Add WebVTT subtitles as a track on the video and show them. */
+  const addSubtitleTrack = (vtt: string, label: string, lang: string, note?: string) => {
     const v = videoRef.current;
     if (!v) return;
+    const track = document.createElement('track');
+    track.kind = 'subtitles';
+    track.label = label;
+    track.srclang = lang;
+    track.src = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }));
+    track.default = true;
+    v.appendChild(track);
+    track.addEventListener('load', () => {
+      const idx = Array.from(v.textTracks).indexOf(track.track);
+      Array.from(v.textTracks).forEach((t, i) => (t.mode = i === idx ? 'showing' : 'disabled'));
+      setSubs((s) => [...s.filter((x) => x.id !== idx), { id: idx, label: track.label }]);
+      setSubSel(idx);
+      setSubOffset(0);
+      toast(`Subtitles on: ${track.label}${note ? `. ${note}` : ''}`, { tone: 'success', ms: note ? 6000 : undefined });
+    });
+  };
+
+  const importSubtitle = async (file: File) => {
     try {
-      const vtt = toVtt(file.name, await file.text());
-      const url = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }));
-      const track = document.createElement('track');
-      track.kind = 'subtitles';
-      track.label = file.name.replace(/\.(srt|vtt)$/i, '');
-      track.srclang = prefs?.subtitleLang ?? 'und';
-      track.src = url;
-      track.default = true;
-      v.appendChild(track);
-      track.addEventListener('load', () => {
-        const idx = Array.from(v.textTracks).indexOf(track.track);
-        Array.from(v.textTracks).forEach((t, i) => (t.mode = i === idx ? 'showing' : 'disabled'));
-        setSubs((s) => [...s.filter((x) => x.id !== idx), { id: idx, label: track.label }]);
-        setSubSel(idx);
-        setSubOffset(0);
-        toast(`Subtitles loaded: ${track.label}`, { tone: 'success' });
-      });
+      addSubtitleTrack(toVtt(file.name, await file.text()), file.name.replace(/\.(srt|vtt)$/i, ''), prefs?.subtitleLang ?? 'und');
     } catch (err) {
       toast((err as Error).message, { tone: 'error' });
     }
+  };
+
+  /** Download subtitles chosen from OpenSubtitles (through the server) and show them. */
+  const loadOnlineSubtitle = async (r: SubtitleResult) => {
+    const { url, remaining } = await api.post<{ url: string; remaining?: number }>('/api/subtitles/download', { fileId: r.fileId });
+    const res = await fetch(url, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('Couldn’t load those subtitles. Try another result.');
+    const label = `${languageName(r.language)}${r.hearingImpaired ? ' (SDH)' : ''}`;
+    addSubtitleTrack(await res.text(), label, r.language.split('-')[0], remaining !== undefined && remaining <= 5 ? `${remaining} OpenSubtitles downloads left today.` : undefined);
+    setMenu(null);
   };
 
   const adjustOffset = (delta: number) => {
@@ -546,7 +562,7 @@ function WebPlayer() {
     () =>
       pushBack(() => {
         if (menu) {
-          setMenu(null);
+          setMenu(menu === 'subs-online' ? 'subtitles' : null);
           return true;
         }
         exit();
@@ -557,7 +573,7 @@ function WebPlayer() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const k = e.key;
+      const k = remoteKey(e);
       const typing = (e.target as HTMLElement).tagName === 'INPUT';
       if (typing) return;
       poke();
@@ -566,6 +582,7 @@ function WebPlayer() {
         togglePlay();
       } else if (k === 'MediaPlay') void videoRef.current?.play();
       else if (k === 'MediaPause') videoRef.current?.pause();
+      else if (k === 'MediaStop') exit();
       else if (k === 'j' || k === 'MediaRewind') seek(-10);
       else if (k === 'l' || k === 'MediaFastForward') seek(10);
       else if (k === 'f') toggleFullscreen();
@@ -821,6 +838,11 @@ function WebPlayer() {
                   title="Subtitles"
                   items={[{ key: -1, label: 'Off', selected: subSel < 0, run: () => chooseSub(-1) }, ...subs.map((s) => ({ key: s.id, label: s.label, selected: s.id === subSel, run: () => chooseSub(s.id) }))]}
                 />
+                {info?.onlineSubtitles && (
+                  <button className="menu-item" onClick={() => setMenu('subs-online')}>
+                    <IconSearch /> Find subtitles online
+                  </button>
+                )}
                 <label className="menu-item" tabIndex={0} data-focusable onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget.querySelector('input') as HTMLInputElement)?.click()}>
                   <IconUpload /> Load subtitle file (.srt, .vtt)
                   <input type="file" accept=".srt,.vtt,text/vtt" hidden onChange={(e) => e.target.files?.[0] && importSubtitle(e.target.files[0])} />
@@ -856,10 +878,15 @@ function WebPlayer() {
                     </button>
                   ))}
                 </div>
-                <p className="t-caption" style={{ padding: '0.4rem 0.9rem 0.2rem' }}>
-                  Online subtitle search needs an authorised subtitle service key on the server; it isn’t configured yet.
-                </p>
+                {info && !live && !info.onlineSubtitles && (
+                  <p className="t-caption" style={{ padding: '0.4rem 0.9rem 0.2rem' }}>
+                    {status?.account?.role === 'owner' ? 'To find subtitles online, add an OpenSubtitles API key in Settings → Subtitles.' : 'Online subtitle search isn’t set up on this server.'}
+                  </p>
+                )}
               </>
+            )}
+            {menu === 'subs-online' && info && (
+              <OnlineSubtitles contentId={info.id} defaultLang={prefs?.subtitleLang ?? info.subtitleLang} onBack={() => setMenu('subtitles')} onPick={loadOnlineSubtitle} />
             )}
             {menu === 'settings' && (
               <>

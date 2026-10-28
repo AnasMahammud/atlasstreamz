@@ -1,0 +1,15 @@
+{
+  "id": "com.anasstudios.atlas",
+  "version": "0.3.1",
+  "vendor": "Anas Studios",
+  "type": "web",
+  "main": "index.html",
+  "title": "ATLAS",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "iconColor": "#080A0E",
+  "splashBackground": "splash.png",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true,
+  "requiredACG": []
+}

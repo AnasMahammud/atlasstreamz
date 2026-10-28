@@ -11,4 +11,5 @@ export * from './recommend.ts';
 export * from './pin.ts';
 export * from './backoff.ts';
 export * from './format.ts';
+export * from './subtitles.ts';
 export * as tokens from './tokens.ts';

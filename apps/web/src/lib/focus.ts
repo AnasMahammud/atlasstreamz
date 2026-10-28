@@ -13,6 +13,8 @@
  * stack, falling back to history.back().
  */
 
+import { inWebOsApp, leaveWebOsApp } from './device.ts';
+
 type Dir = 'up' | 'down' | 'left' | 'right';
 
 const SELECTOR = '[data-focusable], button:not([disabled]):not([tabindex="-1"]), a[href], input:not([type="hidden"]):not([disabled]), select, textarea, [tabindex="0"]';
@@ -233,10 +235,15 @@ export function pushBack(handler: () => boolean | void): () => void {
   };
 }
 
+/** Screens with nothing behind them: Back from here leaves the TV apps. */
+const ROOT_PATHS = ['/', '/profiles', '/login', '/setup', '/register'];
+
 export function goBack(): void {
   for (let i = backStack.length - 1; i >= 0; i--) {
     if (backStack[i]() === true) return;
   }
+  // In the LG webOS app, Back from the first screens returns to the TV's home screen.
+  if (inWebOsApp() && ROOT_PATHS.includes(location.pathname)) return leaveWebOsApp();
   // Never step out of Home by accident in a browser.
   if (location.pathname === '/') return;
   if (history.length > 1) history.back();
@@ -250,7 +257,7 @@ export function nativeBack(): boolean {
   for (let i = backStack.length - 1; i >= 0; i--) {
     if (backStack[i]() === true) return true;
   }
-  if (['/', '/profiles', '/login', '/setup', '/register'].includes(location.pathname)) return false;
+  if (ROOT_PATHS.includes(location.pathname)) return false;
   history.back();
   return true;
 }
@@ -286,7 +293,7 @@ export function installSpatialNavigation(): void {
     'pointerover',
     (e) => {
       if (e.pointerType !== 'mouse') return;
-      const el = (e.target as HTMLElement).closest<HTMLElement>('.card, .glass-btn, .chip, .nav-tab');
+      const el = (e.target as HTMLElement).closest<HTMLElement>('.card, .glass-btn, .chip, .nav-tab, .rail-link');
       if (el && document.activeElement !== el && !document.activeElement?.matches('input, textarea')) {
         el.focus({ preventScroll: true });
         const zone = zoneOf(el);

@@ -44,6 +44,27 @@
             android:textSize="14sp" />
     </LinearLayout>
 
+    <!-- Online subtitles (OpenSubtitles via the ATLAS server). Shown with the player controls;
+         the remote's Menu key opens it too. -->
+    <TextView
+        android:id="@+id/subs_online"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_margin="28dp"
+        android:background="@drawable/pill_button"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingStart="22dp"
+        android:paddingTop="11dp"
+        android:paddingEnd="22dp"
+        android:paddingBottom="11dp"
+        android:text="@string/find_subtitles"
+        android:textColor="@color/pill_text"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/error"
         android:layout_width="wrap_content"

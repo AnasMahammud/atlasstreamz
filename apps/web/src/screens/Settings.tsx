@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError, type Profile, type ProfilePrefs, type Provider, type SyncSummary } from '../lib/api.ts';
+import { api, ApiError, type Profile, type ProfilePrefs, type Provider, type SubtitleSettings, type SyncSummary } from '../lib/api.ts';
 import { useStatus } from '../lib/queries.ts';
 import { toast, useUi } from '../lib/store.ts';
 import { focusFirst } from '../lib/focus.ts';
 import { Dialog, Segmented, Switch } from '../components/Primitives.tsx';
 import { PinPad } from '../components/PinPad.tsx';
 import { Avatar } from '../components/Brand.tsx';
-import { IconInfo, IconLogout, IconPlay, IconRefresh, IconSliders, IconSource, IconStorage, IconTrash, IconUser, IconUsers } from '../components/Icons.tsx';
+import { IconInfo, IconLogout, IconPlay, IconRefresh, IconSliders, IconSource, IconStorage, IconSubtitles, IconTrash, IconUser, IconUsers } from '../components/Icons.tsx';
 import { ProviderForm } from './settings/ProviderForm.tsx';
 import { atlasNative } from './Player.tsx';
 
@@ -17,6 +17,7 @@ const SECTIONS = [
   { to: 'playback', label: 'Playback', icon: IconPlay },
   { to: 'appearance', label: 'Appearance', icon: IconSliders },
   { to: 'sources', label: 'Content Sources', icon: IconSource },
+  { to: 'subtitles', label: 'Subtitles', icon: IconSubtitles, ownerOnly: true },
   { to: 'members', label: 'Members', icon: IconUsers, ownerOnly: true },
   { to: 'storage', label: 'Storage', icon: IconStorage },
   { to: 'about', label: 'About', icon: IconInfo },
@@ -138,6 +139,7 @@ export default function Settings() {
             <Route path="storage" element={<StorageSection run={run} />} />
             <Route path="about" element={<AboutSection />} />
             {isOwner && <Route path="members" element={<MembersSection run={run} />} />}
+            {isOwner && <Route path="subtitles" element={<SubtitlesSection run={run} />} />}
           </Routes>
         </section>
       </div>
@@ -672,6 +674,109 @@ function PlaybackSection() {
         <div className="subtitle-preview">
           <span style={{ fontSize: `${(style.size / 100) * 1.4}rem`, background: `rgba(0,0,0,${style.background})` }}>The quick brown fox jumps over the lazy dog.</span>
         </div>
+      </Group>
+    </>
+  );
+}
+
+/* ---------------- Subtitles (OpenSubtitles, owner only) ---------------- */
+
+function SubtitlesSection({ run }: { run: Run }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ['subtitle-settings'], queryFn: () => api.get<SubtitleSettings>('/api/settings/subtitles') });
+  const [apiKey, setApiKey] = useState('');
+  const [username, setUsername] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const configured = !!data?.configured;
+  const user = username ?? data?.username ?? '';
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const next = await run(() => api.put<SubtitleSettings>('/api/settings/subtitles', { apiKey, username: user, password }));
+      if (next) {
+        qc.setQueryData(['subtitle-settings'], next);
+        setApiKey('');
+        setPassword('');
+        setUsername(null);
+        toast('OpenSubtitles connected', { tone: 'success' });
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Couldn’t save.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const turnOff = async () => {
+    const done = await run(() => api.del('/api/settings/subtitles'));
+    if (done) {
+      qc.setQueryData(['subtitle-settings'], { configured: false });
+      toast('Online subtitles turned off');
+    }
+  };
+
+  const status = !data
+    ? '…'
+    : !configured
+      ? 'Off. Viewers can still load subtitle files from their own device.'
+      : [
+          data.username ? `Connected as ${data.username}` : 'Connected with an API key only',
+          data.remaining !== undefined && data.allowed !== undefined && `${data.remaining} of ${data.allowed} downloads left today`,
+          data.error,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+
+  return (
+    <>
+      <Group title="OpenSubtitles">
+        <Row title="Online subtitles" desc={status}>
+          {configured && (
+            <button className="glass-btn sm" onClick={turnOff}>
+              Turn off
+            </button>
+          )}
+        </Row>
+        <form
+          className="settings-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+          style={{ display: 'grid', gap: '1rem', padding: '1rem 1.1rem 1.2rem' }}
+        >
+          <div className="field">
+            <label htmlFor="os-key">API key</label>
+            <input id="os-key" className="input" type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={configured ? 'Saved. Leave blank to keep it.' : 'From opensubtitles.com → API consumers'} />
+          </div>
+          <div className="field">
+            <label htmlFor="os-user">OpenSubtitles username (optional)</label>
+            <input id="os-user" className="input" autoComplete="off" spellCheck={false} value={user} onChange={(e) => setUsername(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="os-pass">OpenSubtitles password</label>
+            <input id="os-pass" className="input" type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={configured && data?.username && user === data.username ? 'Saved. Leave blank to keep it.' : ''} disabled={!user} />
+            {error && <span className="error">{error}</span>}
+          </div>
+          <div>
+            <button className="glass-btn primary" type="submit" disabled={saving || (!configured && !apiKey.trim())}>
+              {saving ? 'Checking with OpenSubtitles…' : configured ? 'Save changes' : 'Connect'}
+            </button>
+          </div>
+        </form>
+      </Group>
+      <Group title="Getting an API key">
+        <Row title="1. Create a free account" desc="Sign up at opensubtitles.com (OpenSubtitles.org’s subtitle library now runs on opensubtitles.com)." />
+        <Row title="2. Create an API consumer" desc="On opensubtitles.com, open your profile menu → API consumers → New consumer, then paste its API key above." />
+        <Row
+          title="3. Add your account (recommended)"
+          desc="With your OpenSubtitles username and password, downloads use your account’s daily allowance, and still work if your consumer doesn’t allow anonymous downloads. Everyone on this server shares it; subtitles already downloaded are kept on the server, so watching again doesn’t count."
+        />
+        <Row title="Privacy" desc="The key and password are stored encrypted on this server and are never sent to viewers’ devices. Searches send OpenSubtitles the title, season and episode, not who is watching." />
       </Group>
     </>
   );
