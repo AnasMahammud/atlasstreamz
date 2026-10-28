@@ -125,6 +125,11 @@ function WebPlayer() {
   const sourceIdx = useRef(0);
   const attempt = useRef(0);
   const retryTimer = useRef<number>();
+  /** Where to pick up after the stream drops mid-way (instead of the original resume point). */
+  const resumeFrom = useRef<number | null>(null);
+  /** Mid-playback drops in a row, and where the last one happened. */
+  const drops = useRef(0);
+  const lastDropAt = useRef(0);
   const hideTimer = useRef<number>();
   const reportedQuality = useRef(false);
   const lastSaved = useRef(0);
@@ -171,6 +176,9 @@ function WebPlayer() {
     reportedQuality.current = false;
     sourceIdx.current = 0;
     attempt.current = 0;
+    resumeFrom.current = null;
+    drops.current = 0;
+    lastDropAt.current = 0;
     api
       .get<PlayInfo>(`/api/play/${enc(id)}`)
       .then((d) => !cancelled && setInfo(d))
@@ -224,7 +232,8 @@ function WebPlayer() {
     setFailure(null);
     setBuffering(true);
     setEngineLabel(source.label);
-    const resumeAt = search.get('start') === '0' ? 0 : info.resumeAt;
+    const reopening = resumeFrom.current !== null;
+    const resumeAt = resumeFrom.current ?? (search.get('start') === '0' ? 0 : info.resumeAt);
     try {
       const handle = await attachEngine(v, source, {
         live: info.kind === 'live',
@@ -240,7 +249,7 @@ function WebPlayer() {
       if (source.engine === 'native' && resumeAt > 0) {
         v.addEventListener('loadedmetadata', () => (v.currentTime = resumeAt), { once: true });
       }
-      if (resumeAt > 0 && attempt.current === 0 && sourceIdx.current === 0) {
+      if (resumeAt > 0 && attempt.current === 0 && sourceIdx.current === 0 && !reopening) {
         toast(`Resuming from ${formatClock(resumeAt)}`, {
           action: {
             label: 'Start over',
@@ -304,7 +313,28 @@ function WebPlayer() {
       const e = engineRef.current;
       window.clearTimeout(retryTimer.current);
       if (kind === 'auth') return void giveUp(kind, detail);
+      // Once a title has been playing, a failure means the stream dropped (provider or network
+      // hiccup), even when the browser calls it "Format error". Reopen it where it stopped, a
+      // few times in a row, before falling back to the handling below.
+      // Right after reopening, the video is back at 0 until it seeks; use the saved spot then.
+      const now = videoRef.current?.currentTime ?? 0;
+      const at = now > 5 ? now : (resumeFrom.current ?? 0);
+      if (at > 5) {
+        if (at - lastDropAt.current > 60) drops.current = 0;
+        lastDropAt.current = at;
+        if (drops.current < 4) {
+          drops.current++;
+          if (!live) resumeFrom.current = at;
+          setBuffering(true);
+          retryTimer.current = window.setTimeout(() => {
+            if (!navigator.onLine) return void giveUp('network', detail);
+            void start();
+          }, backoffDelay(drops.current - 1, 1000, 8000));
+          return;
+        }
+      }
       if (kind === 'network' && e && attempt.current < 3) {
+        if (!live && (videoRef.current?.currentTime ?? 0) > 5) resumeFrom.current = videoRef.current!.currentTime;
         const wait = backoffDelay(attempt.current, 1000, 8000);
         attempt.current++;
         setBuffering(true);
@@ -318,7 +348,7 @@ function WebPlayer() {
       if (nextSource()) return;
       void giveUp(kind, detail);
     },
-    [giveUp, nextSource, start],
+    [giveUp, nextSource, start, live],
   );
   const onFatalRef = useRef(onFatal);
   onFatalRef.current = onFatal;
